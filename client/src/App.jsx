@@ -276,11 +276,13 @@ function LinkedInBadge({ url, size = 50 }) {
 function HostDash({ room, onEnd }) {
   const [followUp, setFollowUp] = useState(null);
   const [rxns, setRxns] = useState([]);
-  const [audioOn, setAudioOn] = useState(true); // Auto-enable audio
+  const [audioOn, setAudioOn] = useState(true);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [transcript, setTranscript] = useState([]);
+  const [transcribing, setTranscribing] = useState(false);
   const audio = useRef(null);
   const pc = useRef(null);
+  const recognition = useRef(null);
   const s = useRef(getSocket());
 
   const enableAudio = () => {
@@ -292,6 +294,83 @@ function HostDash({ room, onEnd }) {
       }).catch(() => {});
     }
   };
+
+  // ── Host-side Speech Recognition ──
+  const startTranscription = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { console.warn("SpeechRecognition not supported"); return; }
+    if (recognition.current) return; // already running
+
+    const recog = new SR();
+    recog.continuous = true;
+    recog.interimResults = false; // only send final results to avoid noise
+    recog.lang = "en-US";
+    recog.maxAlternatives = 1;
+
+    recog.onresult = (event) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          const text = event.results[i][0].transcript.trim();
+          if (text) {
+            s.current.emit("transcript_send", {
+              roomId: room.id,
+              speaker: room.currentSpeaker?.name || "Speaker",
+              text,
+            });
+            console.log("📝 Transcript:", text);
+          }
+        }
+      }
+    };
+
+    recog.onerror = (e) => {
+      console.warn("Speech recognition error:", e.error);
+      if (e.error === "no-speech" || e.error === "audio-capture" || e.error === "network") {
+        setTimeout(() => { try { if (recognition.current) recog.start(); } catch {} }, 500);
+      }
+      if (e.error === "not-allowed") {
+        setTranscribing(false);
+        alert("Microphone permission needed for live transcription. Please allow mic access and try again.");
+      }
+    };
+
+    recog.onend = () => {
+      // Auto-restart if still supposed to be transcribing
+      if (recognition.current === recog) {
+        try { recog.start(); } catch {}
+      }
+    };
+
+    try {
+      recog.start();
+      recognition.current = recog;
+      setTranscribing(true);
+      console.log("🎙️ Host transcription started");
+    } catch (err) {
+      console.error("Failed to start transcription:", err);
+    }
+  }, [room.id, room.currentSpeaker?.name]);
+
+  const stopTranscription = useCallback(() => {
+    if (recognition.current) {
+      const recog = recognition.current;
+      recognition.current = null;
+      try { recog.stop(); } catch {}
+      setTranscribing(false);
+      console.log("🎙️ Host transcription stopped");
+    }
+  }, []);
+
+  // Auto-start transcription only AFTER user has clicked the button once (permission granted)
+  const hasPermission = useRef(false);
+  useEffect(() => {
+    if (room.currentSpeaker && hasPermission.current && !recognition.current) {
+      startTranscription();
+    }
+    if (!room.currentSpeaker && recognition.current) {
+      stopTranscription();
+    }
+  }, [room.currentSpeaker?.id]);
 
   useEffect(() => {
     const sk = s.current;
@@ -347,6 +426,7 @@ function HostDash({ room, onEnd }) {
     return () => {
       ["followup_signal", "reaction_received", "transcript_update", "webrtc_offer", "webrtc_ice"].forEach((e) => sk.off(e));
       if (pc.current) { pc.current.close(); pc.current = null; }
+      if (recognition.current) { const r = recognition.current; recognition.current = null; try { r.stop(); } catch {} }
     };
   }, [room?.id]);
 
@@ -397,6 +477,16 @@ function HostDash({ room, onEnd }) {
         </div>
       )}
 
+      {/* Transcription prompt - show when speaker is live but transcription not active */}
+      {room.currentSpeaker && !transcribing && (
+        <div className="fixed top-16 left-0 right-0 z-50 bg-cyan-600 text-white px-4 py-3 flex items-center justify-center gap-4">
+          <span className="font-bold">📝 Live transcription is OFF</span>
+          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-white text-cyan-700 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-cyan-50">
+            🎙️ Enable Live Transcript
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="h-16 bg-slate-900/80 backdrop-blur border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-2 md:gap-4">
@@ -409,6 +499,12 @@ function HostDash({ room, onEnd }) {
             if (!audioOn) { enableAudio(); } else { setAudioOn(false); if (audio.current) audio.current.muted = true; }
           }}>
             {audioOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </Btn>
+          <Btn v={transcribing ? "success" : "secondary"} sz="sm" onClick={() => {
+            if (transcribing) { stopTranscription(); } else { hasPermission.current = true; startTranscription(); }
+          }} title={transcribing ? "Transcription ON - click to stop" : "Start live transcription"}>
+            <MessageSquare size={16} />
+            {transcribing && <span className="text-xs">●</span>}
           </Btn>
           {room.currentSpeaker && (
             <>
@@ -537,93 +633,14 @@ function Attendee({ room, user, onExit }) {
   const [fuStatus, setFuStatus] = useState(null);
   const [transcript, setTranscript] = useState([]);
   const [canRejoin, setCanRejoin] = useState(false);
-  const [liveText, setLiveText] = useState(""); // current partial recognition
   const pc = useRef(null);
   const stream = useRef(null);
-  const recognition = useRef(null);
   const s = useRef(getSocket());
 
   const myId = s.current?.id;
   const inQueue = room.queue?.some((x) => x.id === myId);
   const qPos = (room.queue?.findIndex((x) => x.id === myId) ?? -1) + 1;
   const speaking = room.currentSpeaker?.id === myId;
-
-  // ── Speech Recognition ──
-  const startSpeechRecognition = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn("Speech Recognition not supported in this browser");
-      return;
-    }
-
-    const recog = new SpeechRecognition();
-    recog.continuous = true;        // Keep listening until stopped
-    recog.interimResults = true;    // Show partial results as they speak
-    recog.lang = "en-US";
-    recog.maxAlternatives = 1;
-
-    recog.onresult = (event) => {
-      let interimText = "";
-      let finalText = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalText += result[0].transcript;
-        } else {
-          interimText += result[0].transcript;
-        }
-      }
-
-      // Show live partial text on speaker's screen
-      if (interimText) setLiveText(interimText);
-
-      // Send final text to everyone via server
-      if (finalText.trim()) {
-        setLiveText("");
-        s.current.emit("transcript_send", {
-          roomId: room.id,
-          speaker: user.name,
-          text: finalText.trim(),
-        });
-      }
-    };
-
-    recog.onerror = (e) => {
-      console.warn("Speech recognition error:", e.error);
-      // Auto-restart on recoverable errors
-      if (e.error === "no-speech" || e.error === "audio-capture" || e.error === "network") {
-        setTimeout(() => {
-          try { recog.start(); } catch {}
-        }, 500);
-      }
-    };
-
-    recog.onend = () => {
-      // Auto-restart if still speaking (recognition stops after silence)
-      if (recognition.current === recog) {
-        try { recog.start(); } catch {}
-      }
-    };
-
-    try {
-      recog.start();
-      recognition.current = recog;
-      console.log("🎙️ Speech recognition started");
-    } catch (err) {
-      console.error("Failed to start speech recognition:", err);
-    }
-  }, [room.id, user.name]);
-
-  const stopSpeechRecognition = useCallback(() => {
-    if (recognition.current) {
-      const recog = recognition.current;
-      recognition.current = null; // Clear ref BEFORE stop to prevent auto-restart
-      try { recog.stop(); } catch {}
-      setLiveText("");
-      console.log("🎙️ Speech recognition stopped");
-    }
-  }, []);
 
   const startRTC = useCallback(async () => {
     try {
@@ -726,14 +743,12 @@ function Attendee({ room, user, onExit }) {
       isSpeaking = true;
       setCanRejoin(false);
       startRTC();
-      startSpeechRecognition();
     });
     sk.on("followup_approved", () => setFuStatus("approved"));
     sk.on("followup_declined", () => {
       isSpeaking = false;
       setFuStatus("declined");
       stopRTC();
-      stopSpeechRecognition();
       setTimeout(() => setFuStatus(null), 3000);
     });
     sk.on("speech_ended", () => {
@@ -746,14 +761,12 @@ function Attendee({ room, user, onExit }) {
       isSpeaking = false;
       setCanRejoin(true);
       stopRTC();
-      stopSpeechRecognition();
     });
     sk.on("removed_from_speaking", () => {
       isSpeaking = false;
       setFuStatus(null);
       setCanRejoin(false);
       stopRTC();
-      stopSpeechRecognition();
     });
     sk.on("removed_from_queue", () => {});
     sk.on("transcript_update", (e) => setTranscript((p) => [...p.slice(-29), e]));
@@ -771,9 +784,8 @@ function Attendee({ room, user, onExit }) {
     return () => {
       ["floor_granted", "followup_approved", "followup_declined", "speech_ended", "speech_done_can_rejoin", "removed_from_speaking", "removed_from_queue", "transcript_update", "webrtc_answer", "webrtc_ice"].forEach((e) => sk.off(e));
       stopRTC();
-      stopSpeechRecognition();
     };
-  }, [startRTC, stopRTC, startSpeechRecognition, stopSpeechRecognition]);
+  }, [startRTC, stopRTC]);
 
   // ── Speaking screen ──
   if (speaking) {
@@ -783,24 +795,7 @@ function Attendee({ room, user, onExit }) {
           <Mic size={64} className="text-green-600" />
         </div>
         <h2 className="text-4xl font-black mb-2 text-center">YOU ARE LIVE</h2>
-        <p className="text-green-200 mb-4">Your voice is streaming</p>
-
-        {/* Live transcription preview */}
-        <div className="w-full max-w-sm mb-6">
-          <div className="bg-black/30 border border-green-400/30 rounded-xl p-4 min-h-[60px]">
-            <p className="text-xs text-green-300 mb-1 flex items-center gap-1">
-              <MessageSquare size={12} /> Live Transcript
-            </p>
-            <p className="text-white text-sm">
-              {liveText ? (
-                <span className="text-green-100 italic">{liveText}...</span>
-              ) : (
-                <span className="text-green-300/50">Listening for speech...</span>
-              )}
-            </p>
-          </div>
-        </div>
-
+        <p className="text-green-200 mb-8">Your voice is streaming</p>
         {fuStatus === "pending" && <div className="bg-yellow-500/20 border border-yellow-500 rounded-xl p-4 mb-4"><p className="text-yellow-200">Waiting for host...</p></div>}
         {fuStatus === "approved" && <div className="bg-green-500/30 border border-green-400 rounded-xl p-4 mb-4"><p className="text-green-200">✓ Continue!</p></div>}
         {fuStatus === "declined" && <div className="bg-red-500/30 border border-red-400 rounded-xl p-4 mb-4"><p className="text-red-200">Follow-up declined</p></div>}
@@ -810,7 +805,7 @@ function Attendee({ room, user, onExit }) {
               <Hand size={24} /> Follow-up
             </Btn>
           )}
-          <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("end_speech", room.id); stopRTC(); stopSpeechRecognition(); }} className="w-full">
+          <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("end_speech", room.id); stopRTC(); }} className="w-full">
             <Square size={24} /> Done
           </Btn>
         </div>

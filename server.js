@@ -308,10 +308,11 @@ io.on('connection', (socket) => {
     io.to(room.id).emit('transcript_update', entry);
   });
 
-  // Speech-to-text from speaker's phone
+  // Speech-to-text from speaker's phone or host
   socket.on('transcript_send', ({ roomId, text, speaker }) => {
     const room = getRoom(roomId);
     if (!room || !text) return;
+    console.log(`📝 Transcript [${roomId}]: ${speaker}: ${text}`);
     const entry = { id: Date.now(), speaker: speaker || room.currentSpeaker?.name || 'Speaker', text, timestamp: Date.now() };
     room.transcript.push(entry);
     if (room.transcript.length > 100) room.transcript = room.transcript.slice(-100);
