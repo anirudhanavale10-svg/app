@@ -308,6 +308,16 @@ io.on('connection', (socket) => {
     io.to(room.id).emit('transcript_update', entry);
   });
 
+  // Speech-to-text from speaker's phone
+  socket.on('transcript_send', ({ roomId, text, speaker }) => {
+    const room = getRoom(roomId);
+    if (!room || !text) return;
+    const entry = { id: Date.now(), speaker: speaker || room.currentSpeaker?.name || 'Speaker', text, timestamp: Date.now() };
+    room.transcript.push(entry);
+    if (room.transcript.length > 100) room.transcript = room.transcript.slice(-100);
+    io.to(room.id).emit('transcript_update', entry);
+  });
+
   socket.on('disconnect', () => {
     console.log(`🔌 -${socket.id.slice(0, 8)}`);
     if (!socket.roomId) return;
