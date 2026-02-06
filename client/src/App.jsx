@@ -542,19 +542,53 @@ function Attendee({ room, user, onExit }) {
       console.log("🎤 Requesting microphone...");
       const ms = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: { ideal: true },
           sampleRate: 48000,
           channelCount: 1,
-          latency: 0,
+          latency: { ideal: 0 },
+          // Chrome-specific advanced constraints
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googEchoCancellation2: true,
+          googDAEchoCancellation: true,
         }
       });
       console.log("✅ Microphone granted");
       stream.current = ms;
+
+      // Apply additional audio processing via Web Audio API
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      window._speakAppAudioCtx = audioCtx;
+      const source = audioCtx.createMediaStreamSource(ms);
+      
+      // Create a dynamics compressor to reduce feedback
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -50;
+      compressor.knee.value = 40;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0;
+      compressor.release.value = 0.25;
+
+      // High-pass filter to cut low-frequency rumble/echo
+      const highpass = audioCtx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 100;
+
+      // Connect: source -> highpass -> compressor -> destination
+      const dest = audioCtx.createMediaStreamDestination();
+      source.connect(highpass);
+      highpass.connect(compressor);
+      compressor.connect(dest);
+
+      const processedStream = dest.stream;
+
       const c = new RTCPeerConnection(ICE);
       pc.current = c;
-      ms.getTracks().forEach((t) => c.addTrack(t, ms));
+      processedStream.getTracks().forEach((t) => c.addTrack(t, processedStream));
 
       c.onicecandidate = (e) => {
         if (e.candidate) s.current.emit("webrtc_ice", { roomId: room.id, candidate: e.candidate });
@@ -579,6 +613,8 @@ function Attendee({ room, user, onExit }) {
   const stopRTC = useCallback(() => {
     if (stream.current) { stream.current.getTracks().forEach((t) => t.stop()); stream.current = null; }
     if (pc.current) { pc.current.close(); pc.current = null; }
+    // Close any AudioContext created during startRTC
+    try { if (window._speakAppAudioCtx) { window._speakAppAudioCtx.close(); window._speakAppAudioCtx = null; } } catch {}
   }, []);
 
   useEffect(() => {
