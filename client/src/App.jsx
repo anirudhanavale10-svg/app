@@ -548,7 +548,6 @@ function Attendee({ room, user, onExit }) {
           sampleRate: 48000,
           channelCount: 1,
           latency: { ideal: 0 },
-          // Chrome-specific advanced constraints
           googEchoCancellation: true,
           googAutoGainControl: true,
           googNoiseSuppression: true,
@@ -560,29 +559,43 @@ function Attendee({ room, user, onExit }) {
       console.log("✅ Microphone granted");
       stream.current = ms;
 
-      // Apply additional audio processing via Web Audio API
+      // ── Audio processing chain to eliminate echo ──
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       window._speakAppAudioCtx = audioCtx;
       const source = audioCtx.createMediaStreamSource(ms);
-      
-      // Create a dynamics compressor to reduce feedback
-      const compressor = audioCtx.createDynamicsCompressor();
-      compressor.threshold.value = -50;
-      compressor.knee.value = 40;
-      compressor.ratio.value = 12;
-      compressor.attack.value = 0;
-      compressor.release.value = 0.25;
 
-      // High-pass filter to cut low-frequency rumble/echo
+      // 1. High-pass filter - cuts low-frequency room rumble & speaker bleed
       const highpass = audioCtx.createBiquadFilter();
       highpass.type = "highpass";
-      highpass.frequency.value = 100;
+      highpass.frequency.value = 150; // Cut below 150Hz (speaker echo is bassy)
+      highpass.Q.value = 0.7;
 
-      // Connect: source -> highpass -> compressor -> destination
+      // 2. Noise gate via dynamics compressor
+      //    Aggressive threshold = only lets through loud/close speech
+      //    Echo from speakers is quieter than direct speech into phone mic
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -35;  // Only pass audio above this level
+      compressor.knee.value = 5;         // Hard knee = sharp cutoff
+      compressor.ratio.value = 20;       // Heavy compression below threshold
+      compressor.attack.value = 0.003;   // Fast attack
+      compressor.release.value = 0.1;    // Quick release so speech sounds natural
+
+      // 3. Gain boost to compensate for compression
+      const makeupGain = audioCtx.createGain();
+      makeupGain.gain.value = 1.5;
+
+      // 4. Second high-pass to clean up any remaining artifacts
+      const highpass2 = audioCtx.createBiquadFilter();
+      highpass2.type = "highpass";
+      highpass2.frequency.value = 80;
+
+      // Connect chain: mic -> highpass -> compressor -> gain -> highpass2 -> output
       const dest = audioCtx.createMediaStreamDestination();
       source.connect(highpass);
       highpass.connect(compressor);
-      compressor.connect(dest);
+      compressor.connect(makeupGain);
+      makeupGain.connect(highpass2);
+      highpass2.connect(dest);
 
       const processedStream = dest.stream;
 
