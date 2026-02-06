@@ -68,11 +68,16 @@ const LANGUAGES = [
 
 async function translateText(text, targetLang) {
   if (!text || targetLang === "en") return text;
+  // MyMemory uses different codes for some languages
+  const langMap = { "zh-CN": "zh", "zh": "zh" };
+  const tl = langMap[targetLang] || targetLang;
   try {
-    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${targetLang}`);
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}`);
+    if (!r.ok) return text;
     const d = await r.json();
-    if (d.responseData?.translatedText && !d.responseData.translatedText.includes("MYMEMORY WARNING")) {
-      return d.responseData.translatedText;
+    const result = d.responseData?.translatedText;
+    if (result && !result.includes("MYMEMORY WARNING") && result.toLowerCase() !== text.toLowerCase()) {
+      return result;
     }
     return text;
   } catch { return text; }
@@ -208,38 +213,39 @@ function TranscriptPanel({ transcript, compact = false }) {
   useEffect(() => {
     if (lang === "en") { setTranslated({}); return; }
     let cancelled = false;
-    const pending = transcript.slice(-20); // only translate recent
-    pending.forEach((e, i) => {
-      const key = `${transcript.length - pending.length + i}-${lang}`;
+    transcript.forEach((e, i) => {
+      const key = `${e.id}-${lang}`;
       if (!translated[key]) {
         translateText(e.text, lang).then((t) => {
-          if (!cancelled) setTranslated((p) => ({ ...p, [key]: t }));
+          if (!cancelled && t !== e.text) setTranslated((p) => ({ ...p, [key]: t }));
         });
       }
     });
     return () => { cancelled = true; };
   }, [lang, transcript.length]);
 
-  const getText = (e, i) => {
+  const getText = (e) => {
     if (lang === "en") return e.text;
-    return translated[`${i}-${lang}`] || e.text;
+    return translated[`${e.id}-${lang}`] || e.text;
   };
 
   return (
     <div className={`flex flex-col ${compact ? "" : "bg-slate-900/50 rounded-2xl border border-slate-800 p-4 h-full"}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className={`font-bold flex items-center gap-2 ${compact ? "text-sm" : ""}`}>
-          <MessageSquare size={compact ? 14 : 16} className="text-cyan-400" />Transcript
+          <MessageSquare size={compact ? 14 : 16} className="text-cyan-400" />
+          Transcript
+          {transcript.length > 0 && <span className="text-green-400 text-xs animate-pulse">● LIVE</span>}
         </h3>
         <LangSelect value={lang} onChange={setLang} />
       </div>
-      <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[400px]"}`}>
+      <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
         {!transcript.length ? (
-          <p className={`text-slate-500 ${compact ? "text-xs" : "text-sm"} italic`}>Waiting...</p>
+          <p className={`text-slate-500 ${compact ? "text-xs" : "text-sm"} italic`}>Transcript will appear here when someone speaks...</p>
         ) : transcript.map((e, i) => (
-          <div key={i} className={`bg-black/30 rounded-lg ${compact ? "p-2" : "p-3"}`}>
-            <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-xs"}`}>{e.speaker}</span>
-            <p className={`mt-1 ${compact ? "text-xs" : "text-sm"}`}>{getText(e, i)}</p>
+          <div key={e.id || i} className={`bg-black/30 rounded-lg ${compact ? "p-2" : "p-4"}`}>
+            <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
+            <p className={`mt-1 ${compact ? "text-xs" : "text-base"}`}>{getText(e)}</p>
           </div>
         ))}
       </div>
@@ -421,98 +427,101 @@ function HostDash({ room, onEnd }) {
       </header>
 
       {/* Body */}
-      <div className="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-auto">
-        {/* Queue - with Grant & Remove buttons */}
-        <div className="lg:col-span-4 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-white/5 bg-white/5">
-            <h2 className="font-bold flex items-center gap-2">
-              <Users size={18} className="text-cyan-400" />Queue ({room.queue?.length || 0})
-            </h2>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {(!room.queue?.length) ? (
-              <p className="text-slate-500 text-center py-8">No one in queue</p>
-            ) : room.queue.map((p, i) => (
-              <div key={p.id} className="bg-black/40 border border-white/10 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400 font-bold shrink-0">{i + 1}</div>
-                    <div className="min-w-0">
-                      <span className="font-bold block truncate">{p.name}</span>
-                      {p.linkedin && <LinkedInBadge url={p.linkedin} size={40} />}
+      <div className="flex-1 p-4 flex flex-col gap-4 overflow-auto">
+        {/* Top: Queue + Stage */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Queue - with Grant & Remove buttons */}
+          <div className="lg:col-span-4 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col overflow-hidden max-h-[45vh]">
+            <div className="p-4 border-b border-white/5 bg-white/5">
+              <h2 className="font-bold flex items-center gap-2">
+                <Users size={18} className="text-cyan-400" />Queue ({room.queue?.length || 0})
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {(!room.queue?.length) ? (
+                <p className="text-slate-500 text-center py-8">No one in queue</p>
+              ) : room.queue.map((p, i) => (
+                <div key={p.id} className="bg-black/40 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400 font-bold shrink-0">{i + 1}</div>
+                      <div className="min-w-0">
+                        <span className="font-bold block truncate">{p.name}</span>
+                        {p.linkedin && <LinkedInBadge url={p.linkedin} size={40} />}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Btn sz="sm" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })}>
+                        <Play size={14} /> Grant
+                      </Btn>
+                      <Btn v="danger" sz="sm" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })} title="Remove from queue">
+                        <X size={14} />
+                      </Btn>
                     </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Btn sz="sm" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })}>
-                      <Play size={14} /> Grant
-                    </Btn>
-                    <Btn v="danger" sz="sm" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })} title="Remove from queue">
-                      <X size={14} />
-                    </Btn>
+                  {p.question && (
+                    <div className="mt-3 bg-slate-800/50 p-3 rounded-lg text-sm text-slate-300 border-l-2 border-cyan-500">
+                      "{p.question}"
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Stage - QR ALWAYS visible */}
+          <div className="lg:col-span-8 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col items-center justify-center p-6">
+            {room.currentSpeaker ? (
+              <div className="text-center w-full">
+                {/* Speaker info */}
+                <div className="mb-4">
+                  <div className="w-28 h-28 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse shadow-[0_0_50px_rgba(34,197,94,0.4)]">
+                    <Mic size={48} className="text-white" />
+                  </div>
+                  <h2 className="text-3xl font-bold mb-1">{room.currentSpeaker.name}</h2>
+                  <p className="text-green-400 font-bold tracking-widest animate-pulse mb-2">● LIVE</p>
+                  {room.currentSpeaker.linkedin && (
+                    <div className="flex justify-center">
+                      <LinkedInBadge url={room.currentSpeaker.linkedin} size={50} />
+                    </div>
+                  )}
+                </div>
+                {/* Persistent QR (smaller) */}
+                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-center gap-4">
+                  <div className="bg-white p-2 rounded-lg">
+                    <QR value={joinUrl} size={80} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-slate-400 text-xs">Scan to join</p>
+                    <div className="flex items-center gap-1">
+                      <code className="text-cyan-400 font-mono text-lg">{room.id}</code>
+                      <CopyBtn text={joinUrl} />
+                    </div>
                   </div>
                 </div>
-                {p.question && (
-                  <div className="mt-3 bg-slate-800/50 p-3 rounded-lg text-sm text-slate-300 border-l-2 border-cyan-500">
-                    "{p.question}"
-                  </div>
-                )}
               </div>
-            ))}
+            ) : (
+              <div className="text-center">
+                <div className="bg-white p-4 rounded-2xl mb-6 inline-block shadow-xl">
+                  <QR value={joinUrl} size={180} />
+                </div>
+                <h2 className="text-2xl font-bold mb-3">Scan to Join</h2>
+                <div className="flex items-center justify-center gap-2">
+                  <code className="text-cyan-400 font-mono text-2xl">{room.id}</code>
+                  <CopyBtn text={room.id} />
+                </div>
+                <p className="text-slate-500 text-sm mt-4">or share:</p>
+                <div className="flex items-center justify-center gap-2 mt-1">
+                  <code className="text-slate-400 text-xs break-all max-w-[250px]">{joinUrl}</code>
+                  <CopyBtn text={joinUrl} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Stage - QR ALWAYS visible */}
-        <div className="lg:col-span-5 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col items-center justify-center p-6">
-          {room.currentSpeaker ? (
-            <div className="text-center w-full">
-              {/* Speaker info */}
-              <div className="mb-4">
-                <div className="w-28 h-28 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse shadow-[0_0_50px_rgba(34,197,94,0.4)]">
-                  <Mic size={48} className="text-white" />
-                </div>
-                <h2 className="text-3xl font-bold mb-1">{room.currentSpeaker.name}</h2>
-                <p className="text-green-400 font-bold tracking-widest animate-pulse mb-2">● LIVE</p>
-                {room.currentSpeaker.linkedin && (
-                  <div className="flex justify-center">
-                    <LinkedInBadge url={room.currentSpeaker.linkedin} size={50} />
-                  </div>
-                )}
-              </div>
-              {/* Persistent QR (smaller) */}
-              <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-center gap-4">
-                <div className="bg-white p-2 rounded-lg">
-                  <QR value={joinUrl} size={80} />
-                </div>
-                <div className="text-left">
-                  <p className="text-slate-400 text-xs">Scan to join</p>
-                  <div className="flex items-center gap-1">
-                    <code className="text-cyan-400 font-mono text-lg">{room.id}</code>
-                    <CopyBtn text={joinUrl} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center">
-              <div className="bg-white p-4 rounded-2xl mb-6 inline-block shadow-xl">
-                <QR value={joinUrl} size={180} />
-              </div>
-              <h2 className="text-2xl font-bold mb-3">Scan to Join</h2>
-              <div className="flex items-center justify-center gap-2">
-                <code className="text-cyan-400 font-mono text-2xl">{room.id}</code>
-                <CopyBtn text={room.id} />
-              </div>
-              <p className="text-slate-500 text-sm mt-4">or share:</p>
-              <div className="flex items-center justify-center gap-2 mt-1">
-                <code className="text-slate-400 text-xs break-all max-w-[250px]">{joinUrl}</code>
-                <CopyBtn text={joinUrl} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Transcript with language selector */}
-        <div className="lg:col-span-3">
+        {/* Bottom: LARGE Transcript panel - full width for projector */}
+        <div className="flex-1 min-h-[200px]">
           <TranscriptPanel transcript={transcript} />
         </div>
       </div>
