@@ -230,12 +230,51 @@ function LangSelect({ value, onChange }) {
   );
 }
 
+// ─── Text-to-Speech helper ───────────────────────────────────────────────────
+const TTS_LANG_MAP = {
+  en: "en-US", fr: "fr-FR", de: "de-DE", es: "es-ES", it: "it-IT",
+  pt: "pt-PT", nl: "nl-NL", pl: "pl-PL", ro: "ro-RO", sv: "sv-SE",
+  da: "da-DK", fi: "fi-FI", no: "nb-NO", el: "el-GR", cs: "cs-CZ",
+  hu: "hu-HU", bg: "bg-BG", hr: "hr-HR", sk: "sk-SK", sl: "sl-SI",
+  et: "et-EE", lv: "lv-LV", lt: "lt-LT", lb: "de-DE", ru: "ru-RU",
+  uk: "uk-UA", tr: "tr-TR",
+};
+
+function speakText(text, langCode) {
+  if (!text || !window.speechSynthesis) return;
+  // Cancel any ongoing speech
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = TTS_LANG_MAP[langCode] || langCode;
+  utter.rate = 1.0;
+  utter.pitch = 1.0;
+  utter.volume = 1.0;
+
+  // Try to find a voice matching the language
+  const voices = window.speechSynthesis.getVoices();
+  const match = voices.find((v) => v.lang.startsWith(langCode)) ||
+                voices.find((v) => v.lang.startsWith(TTS_LANG_MAP[langCode]?.split("-")[0]));
+  if (match) utter.voice = match;
+
+  window.speechSynthesis.speak(utter);
+}
+
 // ─── Transcript Panel (shared between Host & Attendee) ───────────────────────
 function TranscriptPanel({ transcript, compact = false }) {
   const [lang, setLang] = useState("en");
   const [translated, setTranslated] = useState({});
   const [translating, setTranslating] = useState(new Set());
+  const [audioTranslation, setAudioTranslation] = useState(false);
+  const spokenRef = useRef(new Set()); // track which entries have been spoken
   const scrollRef = useRef(null);
+
+  // Preload voices
+  useEffect(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -243,7 +282,7 @@ function TranscriptPanel({ transcript, compact = false }) {
 
   // Translate when language changes or new transcript arrives
   useEffect(() => {
-    if (lang === "en") { setTranslated({}); setTranslating(new Set()); return; }
+    if (lang === "en") { setTranslated({}); setTranslating(new Set()); spokenRef.current.clear(); return; }
     let cancelled = false;
 
     const toTranslate = transcript.filter((e) => !translated[`${e.id}-${lang}`]);
@@ -267,12 +306,26 @@ function TranscriptPanel({ transcript, compact = false }) {
             next.delete(key);
             return next;
           });
+
+          // Speak the translated text if audio translation is ON
+          if (audioTranslation && t && t !== e.text && !spokenRef.current.has(key)) {
+            spokenRef.current.add(key);
+            speakText(t, lang);
+          }
         }
       });
     });
 
     return () => { cancelled = true; };
-  }, [lang, transcript.length]);
+  }, [lang, transcript.length, audioTranslation]);
+
+  // Stop speech when audio translation is turned off or language changes
+  useEffect(() => {
+    if (!audioTranslation && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    spokenRef.current.clear();
+  }, [audioTranslation, lang]);
 
   const getText = (e) => {
     if (lang === "en") return e.text;
@@ -289,11 +342,29 @@ function TranscriptPanel({ transcript, compact = false }) {
           Transcript
           {transcript.length > 0 && <span className="text-green-400 text-xs animate-pulse">● LIVE</span>}
         </h3>
-        <LangSelect value={lang} onChange={setLang} />
+        <div className="flex items-center gap-2">
+          {/* Audio translation toggle - only show when non-English selected */}
+          {lang !== "en" && (
+            <button
+              onClick={() => setAudioTranslation(!audioTranslation)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                audioTranslation
+                  ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
+              }`}
+              title={audioTranslation ? "Audio translation ON - click to mute" : "Click to hear translations spoken aloud"}
+            >
+              {audioTranslation ? <Volume2 size={12} /> : <VolumeX size={12} />}
+              {audioTranslation ? "🔊 Audio ON" : "🔇 Audio"}
+            </button>
+          )}
+          <LangSelect value={lang} onChange={(v) => { setLang(v); setAudioTranslation(false); }} />
+        </div>
       </div>
       {lang !== "en" && (
         <div className="mb-2 text-xs text-cyan-400/70 flex items-center gap-1">
           <Globe size={10} /> Translating to {LANGUAGES.find((l) => l.code === lang)?.label || lang}
+          {audioTranslation && <span className="text-green-400 ml-1">• Audio active</span>}
         </div>
       )}
       <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
