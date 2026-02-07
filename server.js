@@ -17,73 +17,108 @@ const users = new Map();
 const events = [];
 const rooms = new Map();
 
-// ─── Profanity Filter (multi-language) ──────────────────────────────────────
-const PROFANITY = new Set([
-  // English
-  'fuck','shit','bitch','asshole','bastard','damn','crap','dick','pussy','cock',
-  'motherfucker','fucker','fucking','bullshit','ass','whore','slut','piss',
-  'wanker','cunt','twat','bollocks','arse','shitty','dumbass','jackass',
-  // French
-  'merde','putain','connard','connasse','salaud','salope','bordel','enculé',
-  'nique','foutre','bite','couille','pétasse','batard','con','chier',
-  // German
-  'scheiße','scheisse','arschloch','fick','ficken','hurensohn','wichser',
-  'fotze','schwanz','miststück','drecksau','schlampe','vollidiot',
-  // Spanish
-  'mierda','puta','cabrón','coño','joder','pendejo','chingar','verga',
-  'culo','maricón','hijueputa','carajo','gilipollas','hostia','capullo',
-  // Italian
-  'cazzo','merda','stronzo','vaffanculo','minchia','puttana','coglione',
-  'figa','culo','porco','bastardo','troia',
-  // Portuguese
-  'caralho','foda','merda','porra','puta','buceta','filho da puta',
-  'corno','viado','otário',
-  // Dutch
-  'kut','lul','godverdomme','klootzak','hoer','tering','kanker','tyfus',
-  'mongool','flikker',
-  // Polish
-  'kurwa','cholera','pierdolić','dupek','skurwysyn','zasraniec','gówno',
-  'chuj','suka','dupa',
+// ─── Profanity Filter (comprehensive multi-language) ────────────────────────
+// Uses naughty-words package (28 languages, 2400+ words) + manual additions
+const naughtyWords = require('naughty-words');
+const PROFANITY = new Set();
+
+// Load all languages from naughty-words package
+Object.values(naughtyWords).forEach(list => {
+  if (Array.isArray(list)) list.forEach(w => { if (w && w.length >= 2) PROFANITY.add(w.toLowerCase().trim()); });
+});
+
+// Add European languages missing from the package
+const extraWords = [
   // Romanian
-  'pula','pizdă','futui','dracu','căcat','curva','muie','coaie',
-  // Czech
-  'kurva','hovno','prdel','svině','zasraný','debil','kretén','píča',
-  // Hungarian
-  'fasz','baszd','kurva','segg','szar','geci','rohadék','köcsög',
-  // Russian
-  'блять','сука','хуй','пизда','ебать','мудак','пиздец','залупа',
-  // Turkish
-  'siktir','amına','orospu','piç','göt','yarrak','ibne',
-  // Croatian/Serbian
-  'jebem','kurac','pička','sranje','kurva','govno',
-  // Swedish
-  'jävla','fan','skit','fitta','helvete','hora','kuk',
-  // Danish/Norwegian
-  'fanden','lort','røv','pik','luder',
-  // Finnish
-  'vittu','perkele','saatana','paska','kyrpä',
-  // Greek
-  'γαμώ','μαλάκα','πούτσα','σκατά','πουτάνα',
+  'pula','pizdă','pizda','futui','dracu','căcat','cacat','curva','muie','coaie','bulangiu','labagiu','sugipula','dracului',
   // Bulgarian
-  'шибан','путка','майната','курва',
-]);
+  'шибан','путка','майната','курва','мамка','педал','гъз','лайно','дупе','копеле',
+  // Croatian / Serbian / Bosnian
+  'jebem','kurac','pička','picka','sranje','kurva','govno','jebote','drolja','šupak','supak','seljačino',
+  // Slovak
+  'kurva','piča','pica','jebať','jebat','kokot','čurák','curak','hovno','sráč','srac','deboš','robiť dobre',
+  // Slovenian
+  'kurba','pizda','jebati','kurac','sranje','fuka','pofukana','mater','zajebi',
+  // Estonian
+  'kurat','türa','perse','munn','jobu','lits','nussima','sitt','raisk',
+  // Latvian
+  'dirsā','dirsa','pīzda','pizda','sūds','suds','kuce','pidars','mauka',
+  // Lithuanian
+  'šūdas','sudas','bybys','kalė','kale','pyzda','rupūžė','rupuze','subinė','subine',
+  // Greek (additional)
+  'γαμώ','gamo','μαλάκα','malaka','πούτσα','poutsa','σκατά','skata','πουτάνα','poutana','αρχίδι','archidi','μουνί','mouni','καριόλα','kariola','γαμημένε','gamimene',
+  // Ukrainian (additional)
+  'блядь','бляді','хуй','курва','сука','залупа','дрочити','їбати',
+  // Luxembourgish
+  'schäissdrek','dreck','leck','houermamm','arschlach','vollidiott',
+  // Icelandic
+  'fokk','helvíti','andskotinn','rassgat','drullusessa','drusla',
+  // Albanian
+  'qifsha','mut','kar','pidh','bythë','bythe','kurvë','kurve','robqir',
+  // Catalan
+  'filla de puta','collons','cony','merda','carall','puta','cabró','cabro',
+  // Basque
+  'kakazaharra','putakumea','txakurra',
+  // Welsh
+  'cachu','cont','twll din',
+  // Irish
+  'focal','cac','amadán','amadan',
+  // Maltese
+  'ħanina','qaħba','ostja',
+  // Galician
+  'foder','merda','carallo','puta','fillo de puta',
+  // Macedonian
+  'курва','пичка','говно','мајката','ебам',
+  // Belarusian
+  'сука','блядзь','хуй','гаўно',
+  // Georgian
+  'შენი დედა','ტრაკი','მომიტყან',
+  // Armenian
+  'բdelays','քdelays',
+  // Afrikaans
+  'poes','naai','doos','kak','fok','bliksem','moer','vokken',
+  // Swahili
+  'malaya','matako','shenzi','kumamako',
+  // Hindi (transliterated)
+  'bhenchod','madarchod','chutiya','gaand','bhosdike','randi','harami','lauda','lund',
+  // Portuguese (Brazilian additions)
+  'foda-se','piranha','viado','arrombado','cuzão','cuzao','otário','otario',
+  // Arabic (transliterated)
+  'kuss','sharmouta','ibn el sharmouta','ahbal','teez',
+].map(w => w.toLowerCase().trim());
+
+extraWords.forEach(w => { if (w.length >= 2) PROFANITY.add(w); });
+
+console.log(`🚫 Profanity filter loaded: ${PROFANITY.size} words across 40+ languages`);
 
 function filterProfanity(text) {
-  let filtered = text;
   let beeped = false;
-  const words = text.split(/(\s+)/); // split keeping whitespace
+  const words = text.split(/(\s+)/);
   
   const result = words.map(word => {
-    const clean = word.toLowerCase().replace(/[.,!?;:'"()]/g, '');
-    if (clean.length >= 3 && PROFANITY.has(clean)) {
+    // Strip punctuation for matching
+    const clean = word.toLowerCase().replace(/[.,!?;:'"()\-_]/g, '');
+    if (clean.length >= 2 && PROFANITY.has(clean)) {
       beeped = true;
-      // Keep first letter, replace rest with *
-      const punct = word.match(/[.,!?;:'"()]+$/)?.[0] || '';
+      const punct = word.match(/[.,!?;:'"()\-_]+$/)?.[0] || '';
       const core = word.slice(0, word.length - punct.length);
-      return core[0] + '*'.repeat(core.length - 1) + punct;
+      return core[0] + '*'.repeat(Math.max(core.length - 1, 1)) + punct;
     }
+    // Also check multi-word phrases (2-word combos)
     return word;
   }).join('');
+  
+  // Check multi-word phrases
+  const lowerText = text.toLowerCase();
+  for (const phrase of PROFANITY) {
+    if (phrase.includes(' ') && lowerText.includes(phrase)) {
+      beeped = true;
+      // Replace the phrase keeping case
+      const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      const filtered = result.replace(regex, (match) => match[0] + '*'.repeat(match.length - 1));
+      return { text: filtered, beeped };
+    }
+  }
   
   return { text: result, beeped };
 }
