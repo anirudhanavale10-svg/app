@@ -50,37 +50,67 @@ const ICE = {
   rtcpMuxPolicy: "require",
 };
 
-// ─── Translation languages ───────────────────────────────────────────────────
+// ─── Translation languages (European focus) ─────────────────────────────────
 const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Español" },
-  { code: "fr", label: "Français" },
-  { code: "de", label: "Deutsch" },
-  { code: "hi", label: "हिन्दी" },
-  { code: "zh-CN", label: "中文" },
-  { code: "ar", label: "العربية" },
-  { code: "pt", label: "Português" },
-  { code: "ja", label: "日本語" },
-  { code: "ko", label: "한국어" },
-  { code: "it", label: "Italiano" },
-  { code: "ru", label: "Русский" },
+  { code: "en", label: "🇬🇧 English" },
+  { code: "fr", label: "🇫🇷 Français" },
+  { code: "de", label: "🇩🇪 Deutsch" },
+  { code: "es", label: "🇪🇸 Español" },
+  { code: "it", label: "🇮🇹 Italiano" },
+  { code: "pt", label: "🇵🇹 Português" },
+  { code: "nl", label: "🇳🇱 Nederlands" },
+  { code: "pl", label: "🇵🇱 Polski" },
+  { code: "ro", label: "🇷🇴 Română" },
+  { code: "sv", label: "🇸🇪 Svenska" },
+  { code: "da", label: "🇩🇰 Dansk" },
+  { code: "fi", label: "🇫🇮 Suomi" },
+  { code: "no", label: "🇳🇴 Norsk" },
+  { code: "el", label: "🇬🇷 Ελληνικά" },
+  { code: "cs", label: "🇨🇿 Čeština" },
+  { code: "hu", label: "🇭🇺 Magyar" },
+  { code: "bg", label: "🇧🇬 Български" },
+  { code: "hr", label: "🇭🇷 Hrvatski" },
+  { code: "sk", label: "🇸🇰 Slovenčina" },
+  { code: "sl", label: "🇸🇮 Slovenščina" },
+  { code: "et", label: "🇪🇪 Eesti" },
+  { code: "lv", label: "🇱🇻 Latviešu" },
+  { code: "lt", label: "🇱🇹 Lietuvių" },
+  { code: "lb", label: "🇱🇺 Lëtzebuergesch" },
+  { code: "ru", label: "🇷🇺 Русский" },
+  { code: "uk", label: "🇺🇦 Українська" },
+  { code: "tr", label: "🇹🇷 Türkçe" },
 ];
+
+// Translation queue to avoid rate limiting
+let translateQueue = Promise.resolve();
 
 async function translateText(text, targetLang) {
   if (!text || targetLang === "en") return text;
-  // MyMemory uses different codes for some languages
-  const langMap = { "zh-CN": "zh", "zh": "zh" };
+  // MyMemory language code fixes
+  const langMap = { "no": "nb", "lb": "de" }; // Norwegian→Bokmål, Luxembourgish→German fallback
   const tl = langMap[targetLang] || targetLang;
-  try {
-    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}`);
-    if (!r.ok) return text;
-    const d = await r.json();
-    const result = d.responseData?.translatedText;
-    if (result && !result.includes("MYMEMORY WARNING") && result.toLowerCase() !== text.toLowerCase()) {
-      return result;
-    }
-    return text;
-  } catch { return text; }
+
+  // Queue translations to avoid hitting rate limits
+  const result = await new Promise((resolve) => {
+    translateQueue = translateQueue.then(async () => {
+      try {
+        // Small delay between requests to avoid rate limits
+        await new Promise(r => setTimeout(r, 200));
+        const r = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
+        );
+        if (!r.ok) { resolve(text); return; }
+        const d = await r.json();
+        const translated = d.responseData?.translatedText;
+        if (translated && !translated.includes("MYMEMORY WARNING") && translated.toLowerCase() !== text.toLowerCase()) {
+          resolve(translated);
+        } else {
+          resolve(text);
+        }
+      } catch { resolve(text); }
+    });
+  });
+  return result;
 }
 
 // ─── Auth Context ────────────────────────────────────────────────────────────
@@ -189,13 +219,13 @@ function LangSelect({ value, onChange }) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1 outline-none focus:border-cyan-500 appearance-none pr-6 cursor-pointer"
+        className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-cyan-500 appearance-none pr-7 cursor-pointer min-w-[140px]"
       >
         {LANGUAGES.map((l) => (
           <option key={l.code} value={l.code}>{l.label}</option>
         ))}
       </select>
-      <ChevronDown size={12} className="absolute right-1 text-slate-400 pointer-events-none" />
+      <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
     </div>
   );
 }
@@ -204,29 +234,51 @@ function LangSelect({ value, onChange }) {
 function TranscriptPanel({ transcript, compact = false }) {
   const [lang, setLang] = useState("en");
   const [translated, setTranslated] = useState({});
+  const [translating, setTranslating] = useState(new Set());
   const scrollRef = useRef(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [transcript, translated]);
 
+  // Translate when language changes or new transcript arrives
   useEffect(() => {
-    if (lang === "en") { setTranslated({}); return; }
+    if (lang === "en") { setTranslated({}); setTranslating(new Set()); return; }
     let cancelled = false;
-    transcript.forEach((e, i) => {
-      const key = `${e.id}-${lang}`;
-      if (!translated[key]) {
-        translateText(e.text, lang).then((t) => {
-          if (!cancelled && t !== e.text) setTranslated((p) => ({ ...p, [key]: t }));
-        });
-      }
+
+    const toTranslate = transcript.filter((e) => !translated[`${e.id}-${lang}`]);
+    if (toTranslate.length === 0) return;
+
+    // Mark as translating
+    setTranslating((prev) => {
+      const next = new Set(prev);
+      toTranslate.forEach((e) => next.add(`${e.id}-${lang}`));
+      return next;
     });
+
+    // Translate each untranslated entry
+    toTranslate.forEach((e) => {
+      const key = `${e.id}-${lang}`;
+      translateText(e.text, lang).then((t) => {
+        if (!cancelled) {
+          setTranslated((p) => ({ ...p, [key]: t }));
+          setTranslating((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      });
+    });
+
     return () => { cancelled = true; };
   }, [lang, transcript.length]);
 
   const getText = (e) => {
     if (lang === "en") return e.text;
-    return translated[`${e.id}-${lang}`] || e.text;
+    const key = `${e.id}-${lang}`;
+    if (translating.has(key)) return null; // still translating
+    return translated[key] || e.text;
   };
 
   return (
@@ -239,15 +291,30 @@ function TranscriptPanel({ transcript, compact = false }) {
         </h3>
         <LangSelect value={lang} onChange={setLang} />
       </div>
+      {lang !== "en" && (
+        <div className="mb-2 text-xs text-cyan-400/70 flex items-center gap-1">
+          <Globe size={10} /> Translating to {LANGUAGES.find((l) => l.code === lang)?.label || lang}
+        </div>
+      )}
       <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
         {!transcript.length ? (
           <p className={`text-slate-500 ${compact ? "text-xs" : "text-sm"} italic`}>Transcript will appear here when someone speaks...</p>
-        ) : transcript.map((e, i) => (
-          <div key={e.id || i} className={`bg-black/30 rounded-lg ${compact ? "p-2" : "p-4"}`}>
-            <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
-            <p className={`mt-1 ${compact ? "text-xs" : "text-base"}`}>{getText(e)}</p>
-          </div>
-        ))}
+        ) : transcript.map((e, i) => {
+          const text = getText(e);
+          return (
+            <div key={e.id || i} className={`bg-black/30 rounded-lg ${compact ? "p-2" : "p-4"}`}>
+              <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
+              {text === null ? (
+                <p className={`mt-1 ${compact ? "text-xs" : "text-base"} text-slate-400 italic animate-pulse`}>Translating...</p>
+              ) : (
+                <p className={`mt-1 ${compact ? "text-xs" : "text-base"}`}>{text}</p>
+              )}
+              {lang !== "en" && translated[`${e.id}-${lang}`] && (
+                <p className={`mt-1 text-slate-500 ${compact ? "text-[10px]" : "text-xs"} italic`}>{e.text}</p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
