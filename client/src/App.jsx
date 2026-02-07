@@ -23,32 +23,43 @@ function getSocket() {
 }
 
 // ─── WebRTC ──────────────────────────────────────────────────────────────────
-const ICE = {
+// Default config with STUN only (TURN added dynamically)
+let ICE = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
-    // Free TURN servers for NAT traversal
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443?transport=tcp",
-      username: "openrelayproject",
-      credential: "openrelayproject",
-    },
+    { urls: "stun:stun.cloudflare.com:3478" },
   ],
   iceCandidatePoolSize: 10,
   bundlePolicy: "max-bundle",
   rtcpMuxPolicy: "require",
 };
+
+// Fetch fresh TURN credentials from Cloudflare (free, temporary creds)
+async function refreshTurnCredentials() {
+  try {
+    const r = await fetch("https://speed.cloudflare.com/turn-creds");
+    if (r.ok) {
+      const creds = await r.json();
+      ICE = {
+        ...ICE,
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun.cloudflare.com:3478" },
+          { urls: creds.urls.filter(u => u.startsWith("turn:") || u.startsWith("turns:")), username: creds.username, credential: creds.credential },
+        ],
+      };
+      console.log("✅ TURN credentials refreshed");
+    }
+  } catch (e) {
+    console.warn("⚠️ Could not fetch TURN creds, using STUN only:", e.message);
+  }
+}
+// Fetch on load
+refreshTurnCredentials();
+// Refresh every 20 minutes (creds may expire)
+setInterval(refreshTurnCredentials, 20 * 60 * 1000);
 
 // ─── Translation languages (European focus) ─────────────────────────────────
 const LANGUAGES = [
@@ -493,15 +504,15 @@ function TranscriptPanel({ transcript, compact = false }) {
   }, [audioOn]);
 
   return (
-    <div className={`flex flex-col ${compact ? "" : "bg-slate-900 rounded-2xl border border-slate-800 p-4 h-full"}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={`font-semibold flex items-center gap-2 ${compact ? "text-sm text-slate-700" : "text-sm text-slate-300"}`}>
-          <MessageSquare size={compact ? 14 : 15} className={compact ? "text-blue-500" : "text-blue-400"} />
+    <div className={`flex flex-col ${compact ? "" : "p-4"} h-full`}>
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <h3 className="font-semibold flex items-center gap-2 text-sm text-slate-700">
+          <MessageSquare size={14} className="text-blue-500" />
           Transcript
           {transcript.length > 0 && (
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className={`text-xs font-medium ${compact ? "text-emerald-600" : "text-emerald-400"}`}>LIVE</span>
+              <span className="text-xs font-medium text-emerald-600">LIVE</span>
             </span>
           )}
         </h3>
@@ -520,8 +531,8 @@ function TranscriptPanel({ transcript, compact = false }) {
               }}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 audioOn
-                  ? compact ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                  : compact ? "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700" : "bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700"
               }`}
             >
               {audioOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
@@ -532,34 +543,34 @@ function TranscriptPanel({ transcript, compact = false }) {
         </div>
       </div>
       {lang !== "en" && (
-        <div className={`mb-2 text-xs flex items-center gap-1.5 ${compact ? "text-blue-500" : "text-blue-400/70"}`}>
+        <div className="mb-2 text-xs flex items-center gap-1.5 shrink-0 text-blue-500">
           <Globe size={11} /> {LANGUAGES.find((l) => l.code === lang)?.label || lang}
-          {audioOn && <span className={`ml-1 ${compact ? "text-emerald-600" : "text-emerald-400"}`}>• Audio on</span>}
+          {audioOn && <span className="ml-1 text-emerald-600">• Audio on</span>}
         </div>
       )}
-      <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 min-h-0">
         {!transcript.length ? (
-          <p className={`${compact ? "text-xs text-slate-400" : "text-sm text-slate-600"} italic`}>Transcript appears here when someone speaks...</p>
+          <p className="text-sm text-slate-400 italic">Transcript appears here when someone speaks...</p>
         ) : transcript.map((e, i) => {
           const key = `${e.id}-${lang}`;
           const t = lang === "en" ? e.text : translated[key];
           return (
-            <div key={e.id || i} className={`rounded-xl ${compact ? "p-2.5" : "p-3.5"} ${
+            <div key={e.id || i} className={`rounded-xl p-3 ${
               e.beeped
-                ? compact ? "bg-red-50 border border-red-200" : "bg-red-500/10 border border-red-500/20"
-                : compact ? "bg-slate-50 border border-slate-100" : "bg-slate-800/60 border border-slate-800"
+                ? "bg-red-50 border border-red-200"
+                : "bg-slate-50 border border-slate-100"
             }`}>
               <div className="flex items-center gap-2">
-                <span className={`font-semibold ${compact ? "text-xs text-blue-600" : "text-xs text-blue-400"}`}>{e.speaker}</span>
-                {e.beeped && <span className={`text-[10px] font-medium ${compact ? "text-red-500" : "text-red-400"}`}>• filtered</span>}
+                <span className="font-semibold text-xs text-blue-600">{e.speaker}</span>
+                {e.beeped && <span className="text-[10px] font-medium text-red-500">• filtered</span>}
               </div>
               {t === null || t === undefined ? (
-                <p className={`mt-1 ${compact ? "text-xs text-slate-400" : "text-sm text-slate-500"} italic animate-pulse`}>Translating...</p>
+                <p className="mt-1 text-sm text-slate-400 italic animate-pulse">Translating...</p>
               ) : (
-                <p className={`mt-1 ${compact ? "text-xs text-slate-700" : "text-sm text-slate-200"}`}>{t}</p>
+                <p className="mt-1 text-sm text-slate-700">{t}</p>
               )}
               {lang !== "en" && t && t !== e.text && (
-                <p className={`mt-1 italic ${compact ? "text-[10px] text-slate-400" : "text-xs text-slate-500"}`}>{e.text}</p>
+                <p className="mt-1 text-xs text-slate-400 italic">{e.text}</p>
               )}
             </div>
           );
@@ -756,7 +767,7 @@ function HostDash({ room, onEnd }) {
   const joinUrl = `${window.location.origin}?room=${room.id}`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       {/* Floating reactions */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-40">
         {rxns.map((r) => (
@@ -766,18 +777,18 @@ function HostDash({ room, onEnd }) {
 
       {/* Follow-up modal */}
       {followUp && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl animate-slide-up">
-            <div className="w-14 h-14 bg-amber-500/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Hand size={28} className="text-amber-400" />
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <Card className="max-w-sm w-full text-center animate-slide-up shadow-xl">
+            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Hand size={24} className="text-amber-600" />
             </div>
-            <h2 className="text-xl font-bold mb-2 text-white">Follow-up Request</h2>
-            <p className="text-slate-400 mb-6"><span className="text-blue-400 font-semibold">{followUp}</span> wants to continue</p>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Follow-up Request</h2>
+            <p className="text-slate-500 text-sm mb-5"><span className="text-blue-600 font-semibold">{followUp}</span> wants to continue</p>
             <div className="flex gap-3">
-              <Btn v="danger" onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: false }); setFollowUp(null); }} className="flex-1 !bg-red-500/15 !text-red-400 hover:!bg-red-500/25"><X size={18} /> Decline</Btn>
-              <Btn onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: true }); setFollowUp(null); }} className="flex-1 !bg-blue-600 hover:!bg-blue-700 !text-white"><Check size={18} /> Allow</Btn>
+              <Btn v="danger" onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: false }); setFollowUp(null); }} className="flex-1"><X size={16} /> Decline</Btn>
+              <Btn onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: true }); setFollowUp(null); }} className="flex-1"><Check size={16} /> Allow</Btn>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -785,158 +796,164 @@ function HostDash({ room, onEnd }) {
 
       {/* Audio blocked banner */}
       {audioBlocked && (
-        <div className="fixed top-16 left-0 right-0 z-50 bg-amber-500 text-slate-900 px-4 py-3 flex items-center justify-center gap-4 shadow-lg">
-          <span className="font-semibold text-sm">Browser blocked audio playback</span>
-          <button onClick={enableAudio} className="bg-slate-900 text-amber-400 px-4 py-1.5 rounded-lg font-semibold text-sm hover:bg-slate-800 transition">
-            Enable Audio
-          </button>
+        <div className="fixed top-14 left-0 right-0 z-50 bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2.5 flex items-center justify-center gap-4">
+          <span className="font-medium text-sm">Browser blocked audio playback</span>
+          <button onClick={enableAudio} className="bg-amber-600 text-white px-3 py-1 rounded-lg font-semibold text-xs hover:bg-amber-700 transition">Enable Audio</button>
         </div>
       )}
 
       {/* Transcription prompt */}
       {room.currentSpeaker && !transcribing && (
-        <div className="fixed top-16 left-0 right-0 z-50 bg-blue-600 text-white px-4 py-3 flex items-center justify-center gap-4 shadow-lg">
-          <span className="font-semibold text-sm">Live transcription is off</span>
-          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-white text-blue-700 px-4 py-1.5 rounded-lg font-semibold text-sm hover:bg-blue-50 transition">
-            Enable Transcript
-          </button>
+        <div className="fixed top-14 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 text-blue-800 px-4 py-2.5 flex items-center justify-center gap-4">
+          <span className="font-medium text-sm">Live transcription is off</span>
+          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold text-xs hover:bg-blue-700 transition">Enable Transcript</button>
         </div>
       )}
 
-      {/* Header */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0">
+      {/* Header — light white */}
+      <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shrink-0">
         <div className="flex items-center gap-3">
           <Logo sm />
-          <div className="h-5 w-px bg-slate-700" />
-          <span className="bg-slate-800 px-2.5 py-1 rounded-lg font-mono text-blue-400 text-xs font-semibold tracking-wider">{room.id}</span>
-          <span className="text-slate-500 text-xs hidden md:inline">{room.attendeeCount || 0} joined</span>
+          <div className="h-5 w-px bg-slate-200" />
+          <span className="bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg font-mono text-blue-600 text-xs font-semibold tracking-wider">{room.id}</span>
+          <span className="text-slate-400 text-xs hidden md:inline">{room.attendeeCount || 0} joined</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Btn v={audioOn ? "primary" : "secondary"} sz="xs" onClick={() => {
+          <Btn v={audioOn ? "primary" : "outline"} sz="xs" onClick={() => {
             if (!audioOn) { enableAudio(); } else { setAudioOn(false); if (audio.current) audio.current.muted = true; }
-          }} className={audioOn ? "!bg-blue-600 !text-white" : "!bg-slate-800 !text-slate-400"}>
+          }}>
             {audioOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
           </Btn>
-          <Btn v={transcribing ? "success" : "secondary"} sz="xs" onClick={() => {
+          <Btn v={transcribing ? "success" : "outline"} sz="xs" onClick={() => {
             if (transcribing) { stopTranscription(); } else { hasPermission.current = true; startTranscription(); }
-          }} className={transcribing ? "!bg-emerald-600/20 !text-emerald-400" : "!bg-slate-800 !text-slate-400"}>
+          }}>
             <MessageSquare size={14} />
-            {transcribing && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+            {transcribing && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
           </Btn>
           {room.currentSpeaker && (
             <>
-              <Btn v="secondary" sz="xs" onClick={() => s.current.emit("end_speech", room.id)} className="!bg-slate-800 !text-slate-300">
+              <Btn v="outline" sz="xs" onClick={() => s.current.emit("end_speech", room.id)}>
                 <Square size={14} /> End Turn
               </Btn>
-              <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_speaker", room.id)} className="!bg-red-500/15 !text-red-400">
+              <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_speaker", room.id)}>
                 <UserMinus size={14} />
               </Btn>
             </>
           )}
-          <Btn v="danger" sz="xs" onClick={() => { if (confirm("End event for everyone?")) { s.current.emit("end_event", room.id); onEnd(); } }} className="!bg-red-500/15 !text-red-400">
+          <Btn v="danger" sz="xs" onClick={() => { if (confirm("End event for everyone?")) { s.current.emit("end_event", room.id); onEnd(); } }}>
             <Power size={14} />
           </Btn>
         </div>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 p-4 flex flex-col gap-4 overflow-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Queue */}
-          <div className="lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 flex flex-col overflow-hidden max-h-[45vh]">
-            <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
-              <Users size={16} className="text-blue-400" />
-              <h2 className="font-semibold text-sm text-slate-200">Queue</h2>
-              <span className="ml-auto bg-slate-800 text-slate-400 text-xs font-medium px-2 py-0.5 rounded-full">{room.queue?.length || 0}</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {(!room.queue?.length) ? (
-                <p className="text-slate-600 text-center py-8 text-sm">No one in queue</p>
-              ) : room.queue.map((p, i) => (
-                <div key={p.id} className="bg-slate-800/60 rounded-xl p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center text-blue-400 font-bold text-sm shrink-0">{i + 1}</div>
-                      <div className="min-w-0">
-                        <span className="font-semibold text-sm block truncate text-slate-200">{p.name}</span>
-                        {p.linkedin && <LinkedInBadge url={p.linkedin} size={36} />}
-                      </div>
-                    </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <Btn sz="xs" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })} className="!bg-blue-600 !text-white !text-xs !px-2.5">
-                        <Play size={12} /> Grant
-                      </Btn>
-                      <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })} className="!bg-red-500/15 !text-red-400 !px-2">
-                        <X size={12} />
-                      </Btn>
-                    </div>
-                  </div>
-                  {p.question && (
-                    <div className="mt-2 bg-slate-900/60 p-2.5 rounded-lg text-xs text-slate-400 border-l-2 border-blue-500">
-                      "{p.question}"
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+      {/* Body — 3 columns, fills viewport, NO page scroll */}
+      <div className="flex-1 flex gap-3 p-3 min-h-0">
 
-          {/* Stage */}
-          <div className="lg:col-span-8 bg-slate-900 rounded-2xl border border-slate-800 flex flex-col items-center justify-center p-6">
-            {room.currentSpeaker ? (
-              <div className="text-center w-full">
-                <div className="mb-4">
-                  <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 live-ring shadow-lg shadow-emerald-500/20">
-                    <Mic size={40} className="text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold mb-1 text-white">{room.currentSpeaker.name}</h2>
-                  <div className="flex items-center justify-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <p className="text-emerald-400 font-semibold text-sm">LIVE</p>
-                  </div>
-                  {room.currentSpeaker.linkedin && (
-                    <div className="flex justify-center mt-2">
-                      <LinkedInBadge url={room.currentSpeaker.linkedin} size={44} />
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-center gap-4">
-                  <div className="bg-white p-2 rounded-lg">
-                    <QR value={joinUrl} size={72} />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-slate-500 text-xs mb-1">Scan to join</p>
-                    <div className="flex items-center gap-1">
-                      <code className="text-blue-400 font-mono text-lg font-bold">{room.id}</code>
-                      <CopyBtn text={joinUrl} />
+        {/* LEFT: Queue */}
+        <div className="w-72 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden hidden lg:flex">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
+            <Users size={15} className="text-blue-600" />
+            <h2 className="font-semibold text-sm text-slate-800">Queue</h2>
+            <span className="ml-auto bg-slate-100 text-slate-500 text-xs font-medium px-2 py-0.5 rounded-full">{room.queue?.length || 0}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-2 min-h-0">
+            {(!room.queue?.length) ? (
+              <p className="text-slate-400 text-center py-8 text-sm">No one in queue</p>
+            ) : room.queue.map((p, i) => (
+              <div key={p.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">{i + 1}</div>
+                    <div className="min-w-0">
+                      <span className="font-semibold text-sm block truncate text-slate-800">{p.name}</span>
+                      {p.linkedin && <LinkedInBadge url={p.linkedin} size={32} />}
                     </div>
                   </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Btn sz="xs" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })}>
+                      <Play size={11} />
+                    </Btn>
+                    <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })}>
+                      <X size={11} />
+                    </Btn>
+                  </div>
                 </div>
+                {p.question && (
+                  <div className="mt-2 bg-white p-2 rounded-lg text-xs text-slate-600 border-l-2 border-blue-500">"{p.question}"</div>
+                )}
               </div>
-            ) : (
-              <div className="text-center">
-                <div className="bg-white p-4 rounded-2xl mb-5 inline-block shadow-lg">
-                  <QR value={joinUrl} size={160} />
-                </div>
-                <h2 className="text-xl font-bold mb-2 text-white">Scan to Join</h2>
-                <div className="flex items-center justify-center gap-2">
-                  <code className="text-blue-400 font-mono text-2xl font-bold">{room.id}</code>
-                  <CopyBtn text={room.id} />
-                </div>
-                <p className="text-slate-600 text-xs mt-3">or share link:</p>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <code className="text-slate-500 text-xs break-all max-w-[220px]">{joinUrl}</code>
-                  <CopyBtn text={joinUrl} />
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
-        {/* Transcript */}
-        <div className="flex-1 min-h-[200px]">
-          <TranscriptPanel transcript={transcript} />
+        {/* CENTER: Stage (speaker + QR) */}
+        <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center p-6 min-w-0">
+          {room.currentSpeaker ? (
+            <div className="text-center w-full">
+              <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-3 live-ring shadow-lg shadow-emerald-500/20">
+                <Mic size={36} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-1">{room.currentSpeaker.name}</h2>
+              <div className="flex items-center justify-center gap-1.5 mb-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <p className="text-emerald-600 font-semibold text-sm">LIVE</p>
+              </div>
+              {room.currentSpeaker.linkedin && (
+                <div className="flex justify-center mb-3"><LinkedInBadge url={room.currentSpeaker.linkedin} size={40} /></div>
+              )}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-3">
+                <div className="border border-slate-200 p-1.5 rounded-lg shadow-sm"><QR value={joinUrl} size={56} /></div>
+                <div className="text-left">
+                  <p className="text-slate-400 text-xs mb-0.5">Scan to join</p>
+                  <div className="flex items-center gap-1">
+                    <code className="text-blue-600 font-mono text-base font-bold">{room.id}</code>
+                    <CopyBtn text={joinUrl} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center">
+              <div className="border border-slate-200 p-3 rounded-2xl mb-4 inline-block shadow-sm"><QR value={joinUrl} size={160} /></div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Scan to Join</h2>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <code className="text-blue-600 font-mono text-2xl font-bold">{room.id}</code>
+                <CopyBtn text={room.id} />
+              </div>
+              <p className="text-slate-400 text-xs">or share link:</p>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <code className="text-slate-400 text-xs break-all max-w-[220px]">{joinUrl}</code>
+                <CopyBtn text={joinUrl} />
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* RIGHT: Transcript — scrolls internally, never pushes page */}
+        <div className="w-[420px] shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden hidden lg:flex">
+          <TranscriptPanel transcript={transcript} compact />
+        </div>
+      </div>
+
+      {/* Mobile fallback: stacked layout for small screens */}
+      <div className="lg:hidden flex-1 overflow-auto p-3 space-y-3">
+        <Card>
+          {room.currentSpeaker ? (
+            <div className="text-center">
+              <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-2 live-ring">
+                <Mic size={28} className="text-white" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">{room.currentSpeaker.name}</h2>
+              <div className="flex items-center justify-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /><span className="text-emerald-600 text-xs font-semibold">LIVE</span></div>
+            </div>
+          ) : (
+            <div className="text-center">
+              <div className="border border-slate-200 p-2 rounded-xl mb-3 inline-block"><QR value={joinUrl} size={100} /></div>
+              <p className="text-sm font-semibold text-slate-800">Room: <code className="text-blue-600">{room.id}</code> <CopyBtn text={joinUrl} /></p>
+            </div>
+          )}
+        </Card>
+        <TranscriptPanel transcript={transcript} compact />
       </div>
 
       <style>{`@keyframes floatUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-400px) scale(.5)}}`}</style>
@@ -1066,6 +1083,8 @@ function Attendee({ room, user, onExit }) {
       isSpeaking = false;
       setFuStatus("declined");
       stopRTC();
+      // Don't clear fuStatus immediately - let room_data update show queue position
+      // The server already puts the speaker back in queue, so room_data will show inQueue=true
       setTimeout(() => setFuStatus(null), 3000);
     });
     sk.on("speech_ended", () => {
