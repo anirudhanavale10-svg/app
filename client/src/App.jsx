@@ -694,8 +694,11 @@ function HostDash({ room, onEnd }) {
     if (room.currentSpeaker && hasPermission.current && !recognition.current) {
       startTranscription();
     }
-    if (!room.currentSpeaker && recognition.current) {
-      stopTranscription();
+    if (!room.currentSpeaker) {
+      // Always stop transcription when no one is speaking - prevents picking up ambient audio
+      if (recognition.current) {
+        stopTranscription();
+      }
     }
   }, [room.currentSpeaker?.id]);
 
@@ -824,8 +827,8 @@ function HostDash({ room, onEnd }) {
           }}>
             {audioOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
           </Btn>
-          <Btn v={transcribing ? "success" : "outline"} sz="xs" onClick={() => {
-            if (transcribing) { stopTranscription(); } else { hasPermission.current = true; startTranscription(); }
+          <Btn v={transcribing ? "success" : "outline"} sz="xs" disabled={!room.currentSpeaker && !transcribing} onClick={() => {
+            if (transcribing) { stopTranscription(); } else if (room.currentSpeaker) { hasPermission.current = true; startTranscription(); }
           }}>
             <MessageSquare size={14} />
             {transcribing ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> <span className="hidden sm:inline">Live</span></> : <span className="hidden sm:inline">Transcript</span>}
