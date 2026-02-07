@@ -210,49 +210,52 @@ const useAuth = () => useContext(AuthCtx);
 
 // ─── UI primitives ───────────────────────────────────────────────────────────
 const Logo = ({ sm }) => (
-  <div className={`flex items-center gap-2 font-black select-none ${sm ? "text-xl" : "text-2xl"}`}>
-    <div className="bg-cyan-500 text-black px-2 py-1 rounded-lg">S</div>
-    <span className="text-white">Speak<span className="text-cyan-500">App</span></span>
+  <div className={`flex items-center gap-2.5 select-none ${sm ? "" : ""}`}>
+    <div className={`${sm ? "w-8 h-8 text-sm" : "w-9 h-9 text-base"} bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-md shadow-blue-600/20`}>S</div>
+    <span className={`${sm ? "text-lg" : "text-xl"} font-bold tracking-tight`}>
+      Speak<span className="text-blue-600">App</span>
+    </span>
   </div>
 );
 
 const Card = ({ children, className = "" }) => (
-  <div className={`bg-slate-900/90 backdrop-blur border border-white/10 rounded-2xl p-6 shadow-xl ${className}`}>{children}</div>
+  <div className={`bg-white rounded-2xl border border-slate-200 p-6 shadow-sm ${className}`}>{children}</div>
 );
 
 const Btn = ({ children, v = "primary", sz = "md", disabled, onClick, className = "", type = "button" }) => {
-  const base = "font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 select-none";
+  const base = "font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed select-none cursor-pointer";
   const vs = {
-    primary: "bg-cyan-500 hover:bg-cyan-400 text-black active:scale-95",
-    secondary: "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 active:scale-95",
-    danger: "bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 active:scale-95",
-    ghost: "hover:bg-white/10 text-slate-400 hover:text-white",
-    success: "bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50 active:scale-95",
+    primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-600/20 active:scale-[0.98]",
+    secondary: "bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-[0.98]",
+    danger: "bg-red-50 hover:bg-red-100 text-red-600 active:scale-[0.98]",
+    ghost: "hover:bg-slate-100 text-slate-500 hover:text-slate-700",
+    success: "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 active:scale-[0.98]",
+    outline: "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm active:scale-[0.98]",
   };
-  const ss = { sm: "px-3 py-2 text-sm", md: "px-4 py-3", lg: "px-6 py-4 text-lg", xs: "px-2 py-1 text-xs" };
+  const ss = { xs: "px-2.5 py-1.5 text-xs", sm: "px-3 py-2 text-sm", md: "px-4 py-2.5 text-sm", lg: "px-5 py-3 text-base" };
   return <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${vs[v] || vs.primary} ${ss[sz] || ss.md} ${className}`}>{children}</button>;
 };
 
 const Field = ({ label, ...p }) => (
   <div className="w-full">
-    {label && <label className="block text-sm text-slate-400 mb-1.5">{label}</label>}
-    <input className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white outline-none focus:border-cyan-500 transition" {...p} />
+    {label && <label className="block text-sm font-medium text-slate-600 mb-1.5">{label}</label>}
+    <input className="w-full bg-white border border-slate-200 px-3.5 py-2.5 rounded-xl text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition placeholder:text-slate-400 text-sm" {...p} />
   </div>
 );
 
 const QR = ({ value, size = 200 }) => (
-  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&bgcolor=FFFFFF&color=000000&margin=10`} alt="QR" className="rounded-xl shadow-lg" style={{ width: size, height: size }} />
+  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&bgcolor=FFFFFF&color=0f172a&margin=8`} alt="QR" className="rounded-xl" style={{ width: size, height: size }} />
 );
 
 const Status = ({ ok }) => (
-  <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 ${ok ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse"}`}>
-    {ok ? <Wifi size={14} /> : <WifiOff size={14} />}{ok ? "CONNECTED" : "CONNECTING..."}
+  <div className={`fixed top-4 right-4 z-50 px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-2 shadow-sm ${ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse"}`}>
+    {ok ? <Wifi size={13} /> : <WifiOff size={13} />}{ok ? "Connected" : "Connecting..."}
   </div>
 );
 
 const CopyBtn = ({ text }) => {
   const [ok, setOk] = useState(false);
-  return <button onClick={() => { navigator.clipboard.writeText(text); setOk(true); setTimeout(() => setOk(false), 2000); }} className="p-2 hover:bg-white/10 rounded-lg">{ok ? <Check size={18} className="text-green-400" /> : <Copy size={18} className="text-slate-400" />}</button>;
+  return <button onClick={() => { navigator.clipboard.writeText(text); setOk(true); setTimeout(() => setOk(false), 2000); }} className="p-1.5 hover:bg-slate-100 rounded-lg transition">{ok ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} className="text-slate-400" />}</button>;
 };
 
 // ─── LinkedIn Icon (inline SVG to avoid extra dependency) ────────────────────
@@ -268,11 +271,11 @@ const LinkedInIcon = ({ size = 16, className = "" }) => (
 function LangSelect({ value, onChange }) {
   return (
     <div className="relative inline-flex items-center">
-      <Globe size={14} className="text-cyan-400 mr-1" />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-cyan-500 appearance-none pr-7 cursor-pointer min-w-[140px]"
+        className="bg-transparent border border-slate-200 text-slate-700 text-xs font-medium rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 appearance-none pr-7 cursor-pointer min-w-[130px]"
+        style={{ colorScheme: 'light' }}
       >
         {LANGUAGES.map((l) => (
           <option key={l.code} value={l.code}>{l.label}</option>
@@ -490,19 +493,23 @@ function TranscriptPanel({ transcript, compact = false }) {
   }, [audioOn]);
 
   return (
-    <div className={`flex flex-col ${compact ? "" : "bg-slate-900/50 rounded-2xl border border-slate-800 p-4 h-full"}`}>
+    <div className={`flex flex-col ${compact ? "" : "bg-slate-900 rounded-2xl border border-slate-800 p-4 h-full"}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className={`font-bold flex items-center gap-2 ${compact ? "text-sm" : ""}`}>
-          <MessageSquare size={compact ? 14 : 16} className="text-cyan-400" />
+        <h3 className={`font-semibold flex items-center gap-2 ${compact ? "text-sm text-slate-700" : "text-sm text-slate-300"}`}>
+          <MessageSquare size={compact ? 14 : 15} className={compact ? "text-blue-500" : "text-blue-400"} />
           Transcript
-          {transcript.length > 0 && <span className="text-green-400 text-xs animate-pulse">● LIVE</span>}
+          {transcript.length > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className={`text-xs font-medium ${compact ? "text-emerald-600" : "text-emerald-400"}`}>LIVE</span>
+            </span>
+          )}
         </h3>
         <div className="flex items-center gap-2">
           {lang !== "en" && (
             <button
               onClick={() => {
                 if (!audioOn) {
-                  // Unlock TTS on mobile with user gesture
                   if (window.speechSynthesis) {
                     const u = new SpeechSynthesisUtterance("");
                     u.volume = 0;
@@ -511,44 +518,48 @@ function TranscriptPanel({ transcript, compact = false }) {
                 }
                 setAudioOn(!audioOn);
               }}
-              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 audioOn
-                  ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                  : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
+                  ? compact ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                  : compact ? "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700" : "bg-slate-800 text-slate-500 border border-slate-700 hover:text-slate-300"
               }`}
             >
               {audioOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
-              {audioOn ? "🔊 ON" : "🔇 Listen"}
+              {audioOn ? "Audio ON" : "Listen"}
             </button>
           )}
           <LangSelect value={lang} onChange={setLang} />
         </div>
       </div>
       {lang !== "en" && (
-        <div className="mb-2 text-xs text-cyan-400/70 flex items-center gap-1">
-          <Globe size={10} /> {LANGUAGES.find((l) => l.code === lang)?.label || lang}
-          {audioOn && <span className="text-green-400 ml-1">• 🔊 Audio</span>}
+        <div className={`mb-2 text-xs flex items-center gap-1.5 ${compact ? "text-blue-500" : "text-blue-400/70"}`}>
+          <Globe size={11} /> {LANGUAGES.find((l) => l.code === lang)?.label || lang}
+          {audioOn && <span className={`ml-1 ${compact ? "text-emerald-600" : "text-emerald-400"}`}>• Audio on</span>}
         </div>
       )}
       <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
         {!transcript.length ? (
-          <p className={`text-slate-500 ${compact ? "text-xs" : "text-sm"} italic`}>Transcript appears here when someone speaks...</p>
+          <p className={`${compact ? "text-xs text-slate-400" : "text-sm text-slate-600"} italic`}>Transcript appears here when someone speaks...</p>
         ) : transcript.map((e, i) => {
           const key = `${e.id}-${lang}`;
           const t = lang === "en" ? e.text : translated[key];
           return (
-            <div key={e.id || i} className={`rounded-lg ${compact ? "p-2" : "p-4"} ${e.beeped ? "bg-red-900/30 border border-red-500/20" : "bg-black/30"}`}>
+            <div key={e.id || i} className={`rounded-xl ${compact ? "p-2.5" : "p-3.5"} ${
+              e.beeped
+                ? compact ? "bg-red-50 border border-red-200" : "bg-red-500/10 border border-red-500/20"
+                : compact ? "bg-slate-50 border border-slate-100" : "bg-slate-800/60 border border-slate-800"
+            }`}>
               <div className="flex items-center gap-2">
-                <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
-                {e.beeped && <span className="text-red-400 text-[10px]">🔇 filtered</span>}
+                <span className={`font-semibold ${compact ? "text-xs text-blue-600" : "text-xs text-blue-400"}`}>{e.speaker}</span>
+                {e.beeped && <span className={`text-[10px] font-medium ${compact ? "text-red-500" : "text-red-400"}`}>• filtered</span>}
               </div>
               {t === null || t === undefined ? (
-                <p className={`mt-1 ${compact ? "text-xs" : "text-base"} text-slate-400 italic animate-pulse`}>Translating...</p>
+                <p className={`mt-1 ${compact ? "text-xs text-slate-400" : "text-sm text-slate-500"} italic animate-pulse`}>Translating...</p>
               ) : (
-                <p className={`mt-1 ${compact ? "text-xs" : "text-base"}`}>{t}</p>
+                <p className={`mt-1 ${compact ? "text-xs text-slate-700" : "text-sm text-slate-200"}`}>{t}</p>
               )}
               {lang !== "en" && t && t !== e.text && (
-                <p className={`mt-1 text-slate-500 ${compact ? "text-[10px]" : "text-xs"} italic`}>{e.text}</p>
+                <p className={`mt-1 italic ${compact ? "text-[10px] text-slate-400" : "text-xs text-slate-500"}`}>{e.text}</p>
               )}
             </div>
           );
@@ -745,7 +756,7 @@ function HostDash({ room, onEnd }) {
   const joinUrl = `${window.location.origin}?room=${room.id}`;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       {/* Floating reactions */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-40">
         {rxns.map((r) => (
@@ -755,18 +766,18 @@ function HostDash({ room, onEnd }) {
 
       {/* Follow-up modal */}
       {followUp && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-              <Hand size={32} className="text-black" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl animate-slide-up">
+            <div className="w-14 h-14 bg-amber-500/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Hand size={28} className="text-amber-400" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">Follow-up Request</h2>
-            <p className="text-slate-400 mb-6"><span className="text-cyan-400 font-bold">{followUp}</span> wants to continue</p>
-            <div className="flex gap-4">
-              <Btn v="danger" onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: false }); setFollowUp(null); }} className="flex-1"><X size={20} /> Decline</Btn>
-              <Btn onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: true }); setFollowUp(null); }} className="flex-1"><Check size={20} /> Allow</Btn>
+            <h2 className="text-xl font-bold mb-2 text-white">Follow-up Request</h2>
+            <p className="text-slate-400 mb-6"><span className="text-blue-400 font-semibold">{followUp}</span> wants to continue</p>
+            <div className="flex gap-3">
+              <Btn v="danger" onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: false }); setFollowUp(null); }} className="flex-1 !bg-red-500/15 !text-red-400 hover:!bg-red-500/25"><X size={18} /> Decline</Btn>
+              <Btn onClick={() => { s.current.emit("followup_response", { roomId: room.id, approved: true }); setFollowUp(null); }} className="flex-1 !bg-blue-600 hover:!bg-blue-700 !text-white"><Check size={18} /> Allow</Btn>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
@@ -774,94 +785,94 @@ function HostDash({ room, onEnd }) {
 
       {/* Audio blocked banner */}
       {audioBlocked && (
-        <div className="fixed top-16 left-0 right-0 z-50 bg-yellow-500 text-black px-4 py-3 flex items-center justify-center gap-4">
-          <span className="font-bold">🔇 Browser blocked audio playback</span>
-          <button onClick={enableAudio} className="bg-black text-yellow-500 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-gray-900">
-            🔊 Click to Enable Audio
+        <div className="fixed top-16 left-0 right-0 z-50 bg-amber-500 text-slate-900 px-4 py-3 flex items-center justify-center gap-4 shadow-lg">
+          <span className="font-semibold text-sm">Browser blocked audio playback</span>
+          <button onClick={enableAudio} className="bg-slate-900 text-amber-400 px-4 py-1.5 rounded-lg font-semibold text-sm hover:bg-slate-800 transition">
+            Enable Audio
           </button>
         </div>
       )}
 
-      {/* Transcription prompt - show when speaker is live but transcription not active */}
+      {/* Transcription prompt */}
       {room.currentSpeaker && !transcribing && (
-        <div className="fixed top-16 left-0 right-0 z-50 bg-cyan-600 text-white px-4 py-3 flex items-center justify-center gap-4">
-          <span className="font-bold">📝 Live transcription is OFF</span>
-          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-white text-cyan-700 px-4 py-1.5 rounded-lg font-bold text-sm hover:bg-cyan-50">
-            🎙️ Enable Live Transcript
+        <div className="fixed top-16 left-0 right-0 z-50 bg-blue-600 text-white px-4 py-3 flex items-center justify-center gap-4 shadow-lg">
+          <span className="font-semibold text-sm">Live transcription is off</span>
+          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-white text-blue-700 px-4 py-1.5 rounded-lg font-semibold text-sm hover:bg-blue-50 transition">
+            Enable Transcript
           </button>
         </div>
       )}
 
       {/* Header */}
-      <header className="h-16 bg-slate-900/80 backdrop-blur border-b border-white/10 flex items-center justify-between px-4 md:px-6 shrink-0">
-        <div className="flex items-center gap-2 md:gap-4">
+      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0">
+        <div className="flex items-center gap-3">
           <Logo sm />
-          <span className="bg-white/10 px-3 py-1 rounded-lg font-mono text-cyan-400 text-sm">{room.id}</span>
-          <span className="text-slate-500 text-sm hidden md:inline">({room.attendeeCount || 0} joined)</span>
+          <div className="h-5 w-px bg-slate-700" />
+          <span className="bg-slate-800 px-2.5 py-1 rounded-lg font-mono text-blue-400 text-xs font-semibold tracking-wider">{room.id}</span>
+          <span className="text-slate-500 text-xs hidden md:inline">{room.attendeeCount || 0} joined</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Btn v={audioOn ? "primary" : "secondary"} sz="sm" onClick={() => {
+        <div className="flex items-center gap-1.5">
+          <Btn v={audioOn ? "primary" : "secondary"} sz="xs" onClick={() => {
             if (!audioOn) { enableAudio(); } else { setAudioOn(false); if (audio.current) audio.current.muted = true; }
-          }}>
-            {audioOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          }} className={audioOn ? "!bg-blue-600 !text-white" : "!bg-slate-800 !text-slate-400"}>
+            {audioOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
           </Btn>
-          <Btn v={transcribing ? "success" : "secondary"} sz="sm" onClick={() => {
+          <Btn v={transcribing ? "success" : "secondary"} sz="xs" onClick={() => {
             if (transcribing) { stopTranscription(); } else { hasPermission.current = true; startTranscription(); }
-          }} title={transcribing ? "Transcription ON - click to stop" : "Start live transcription"}>
-            <MessageSquare size={16} />
-            {transcribing && <span className="text-xs">●</span>}
+          }} className={transcribing ? "!bg-emerald-600/20 !text-emerald-400" : "!bg-slate-800 !text-slate-400"}>
+            <MessageSquare size={14} />
+            {transcribing && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
           </Btn>
           {room.currentSpeaker && (
             <>
-              <Btn v="secondary" sz="sm" onClick={() => s.current.emit("end_speech", room.id)} title="End speech gracefully">
-                <Square size={16} /> End Turn
+              <Btn v="secondary" sz="xs" onClick={() => s.current.emit("end_speech", room.id)} className="!bg-slate-800 !text-slate-300">
+                <Square size={14} /> End Turn
               </Btn>
-              <Btn v="danger" sz="sm" onClick={() => s.current.emit("remove_speaker", room.id)} title="Remove speaker immediately">
-                <UserMinus size={16} />
+              <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_speaker", room.id)} className="!bg-red-500/15 !text-red-400">
+                <UserMinus size={14} />
               </Btn>
             </>
           )}
-          <Btn v="danger" sz="sm" onClick={() => { if (confirm("End event for everyone?")) { s.current.emit("end_event", room.id); onEnd(); } }}>
-            <Power size={16} />
+          <Btn v="danger" sz="xs" onClick={() => { if (confirm("End event for everyone?")) { s.current.emit("end_event", room.id); onEnd(); } }} className="!bg-red-500/15 !text-red-400">
+            <Power size={14} />
           </Btn>
         </div>
       </header>
 
       {/* Body */}
       <div className="flex-1 p-4 flex flex-col gap-4 overflow-auto">
-        {/* Top: Queue + Stage */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Queue - with Grant & Remove buttons */}
-          <div className="lg:col-span-4 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col overflow-hidden max-h-[45vh]">
-            <div className="p-4 border-b border-white/5 bg-white/5">
-              <h2 className="font-bold flex items-center gap-2">
-                <Users size={18} className="text-cyan-400" />Queue ({room.queue?.length || 0})
-              </h2>
+          {/* Queue */}
+          <div className="lg:col-span-4 bg-slate-900 rounded-2xl border border-slate-800 flex flex-col overflow-hidden max-h-[45vh]">
+            <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+              <Users size={16} className="text-blue-400" />
+              <h2 className="font-semibold text-sm text-slate-200">Queue</h2>
+              <span className="ml-auto bg-slate-800 text-slate-400 text-xs font-medium px-2 py-0.5 rounded-full">{room.queue?.length || 0}</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {(!room.queue?.length) ? (
-                <p className="text-slate-500 text-center py-8">No one in queue</p>
+                <p className="text-slate-600 text-center py-8 text-sm">No one in queue</p>
               ) : room.queue.map((p, i) => (
-                <div key={p.id} className="bg-black/40 border border-white/10 rounded-xl p-4">
+                <div key={p.id} className="bg-slate-800/60 rounded-xl p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center text-cyan-400 font-bold shrink-0">{i + 1}</div>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center text-blue-400 font-bold text-sm shrink-0">{i + 1}</div>
                       <div className="min-w-0">
-                        <span className="font-bold block truncate">{p.name}</span>
-                        {p.linkedin && <LinkedInBadge url={p.linkedin} size={40} />}
+                        <span className="font-semibold text-sm block truncate text-slate-200">{p.name}</span>
+                        {p.linkedin && <LinkedInBadge url={p.linkedin} size={36} />}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Btn sz="sm" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })}>
-                        <Play size={14} /> Grant
+                    <div className="flex gap-1.5 shrink-0">
+                      <Btn sz="xs" disabled={!!room.currentSpeaker} onClick={() => s.current.emit("grant_floor", { roomId: room.id, userId: p.id })} className="!bg-blue-600 !text-white !text-xs !px-2.5">
+                        <Play size={12} /> Grant
                       </Btn>
-                      <Btn v="danger" sz="sm" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })} title="Remove from queue">
-                        <X size={14} />
+                      <Btn v="danger" sz="xs" onClick={() => s.current.emit("remove_from_queue", { roomId: room.id, userId: p.id })} className="!bg-red-500/15 !text-red-400 !px-2">
+                        <X size={12} />
                       </Btn>
                     </div>
                   </div>
                   {p.question && (
-                    <div className="mt-3 bg-slate-800/50 p-3 rounded-lg text-sm text-slate-300 border-l-2 border-cyan-500">
+                    <div className="mt-2 bg-slate-900/60 p-2.5 rounded-lg text-xs text-slate-400 border-l-2 border-blue-500">
                       "{p.question}"
                     </div>
                   )}
@@ -870,32 +881,33 @@ function HostDash({ room, onEnd }) {
             </div>
           </div>
 
-          {/* Stage - QR ALWAYS visible */}
-          <div className="lg:col-span-8 bg-slate-900/50 rounded-2xl border border-slate-800 flex flex-col items-center justify-center p-6">
+          {/* Stage */}
+          <div className="lg:col-span-8 bg-slate-900 rounded-2xl border border-slate-800 flex flex-col items-center justify-center p-6">
             {room.currentSpeaker ? (
               <div className="text-center w-full">
-                {/* Speaker info */}
                 <div className="mb-4">
-                  <div className="w-28 h-28 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse shadow-[0_0_50px_rgba(34,197,94,0.4)]">
-                    <Mic size={48} className="text-white" />
+                  <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 live-ring shadow-lg shadow-emerald-500/20">
+                    <Mic size={40} className="text-white" />
                   </div>
-                  <h2 className="text-3xl font-bold mb-1">{room.currentSpeaker.name}</h2>
-                  <p className="text-green-400 font-bold tracking-widest animate-pulse mb-2">● LIVE</p>
+                  <h2 className="text-2xl font-bold mb-1 text-white">{room.currentSpeaker.name}</h2>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <p className="text-emerald-400 font-semibold text-sm">LIVE</p>
+                  </div>
                   {room.currentSpeaker.linkedin && (
-                    <div className="flex justify-center">
-                      <LinkedInBadge url={room.currentSpeaker.linkedin} size={50} />
+                    <div className="flex justify-center mt-2">
+                      <LinkedInBadge url={room.currentSpeaker.linkedin} size={44} />
                     </div>
                   )}
                 </div>
-                {/* Persistent QR (smaller) */}
-                <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-center gap-4">
+                <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-center gap-4">
                   <div className="bg-white p-2 rounded-lg">
-                    <QR value={joinUrl} size={80} />
+                    <QR value={joinUrl} size={72} />
                   </div>
                   <div className="text-left">
-                    <p className="text-slate-400 text-xs">Scan to join</p>
+                    <p className="text-slate-500 text-xs mb-1">Scan to join</p>
                     <div className="flex items-center gap-1">
-                      <code className="text-cyan-400 font-mono text-lg">{room.id}</code>
+                      <code className="text-blue-400 font-mono text-lg font-bold">{room.id}</code>
                       <CopyBtn text={joinUrl} />
                     </div>
                   </div>
@@ -903,17 +915,17 @@ function HostDash({ room, onEnd }) {
               </div>
             ) : (
               <div className="text-center">
-                <div className="bg-white p-4 rounded-2xl mb-6 inline-block shadow-xl">
-                  <QR value={joinUrl} size={180} />
+                <div className="bg-white p-4 rounded-2xl mb-5 inline-block shadow-lg">
+                  <QR value={joinUrl} size={160} />
                 </div>
-                <h2 className="text-2xl font-bold mb-3">Scan to Join</h2>
+                <h2 className="text-xl font-bold mb-2 text-white">Scan to Join</h2>
                 <div className="flex items-center justify-center gap-2">
-                  <code className="text-cyan-400 font-mono text-2xl">{room.id}</code>
+                  <code className="text-blue-400 font-mono text-2xl font-bold">{room.id}</code>
                   <CopyBtn text={room.id} />
                 </div>
-                <p className="text-slate-500 text-sm mt-4">or share:</p>
-                <div className="flex items-center justify-center gap-2 mt-1">
-                  <code className="text-slate-400 text-xs break-all max-w-[250px]">{joinUrl}</code>
+                <p className="text-slate-600 text-xs mt-3">or share link:</p>
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <code className="text-slate-500 text-xs break-all max-w-[220px]">{joinUrl}</code>
                   <CopyBtn text={joinUrl} />
                 </div>
               </div>
@@ -921,7 +933,7 @@ function HostDash({ room, onEnd }) {
           </div>
         </div>
 
-        {/* Bottom: LARGE Transcript panel - full width for projector */}
+        {/* Transcript */}
         <div className="flex-1 min-h-[200px]">
           <TranscriptPanel transcript={transcript} />
         </div>
@@ -1095,23 +1107,23 @@ function Attendee({ room, user, onExit }) {
   // ── Speaking screen ──
   if (speaking) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-600 to-green-800 text-white flex flex-col items-center justify-center p-6">
-        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mb-6 animate-pulse shadow-2xl">
-          <Mic size={64} className="text-green-600" />
+      <div className="min-h-screen bg-emerald-600 text-white flex flex-col items-center justify-center p-6">
+        <div className="w-28 h-28 bg-white rounded-full flex items-center justify-center mb-6 live-ring shadow-xl">
+          <Mic size={52} className="text-emerald-600" />
         </div>
-        <h2 className="text-4xl font-black mb-2 text-center">YOU ARE LIVE</h2>
-        <p className="text-green-200 mb-8">Your voice is streaming</p>
-        {fuStatus === "pending" && <div className="bg-yellow-500/20 border border-yellow-500 rounded-xl p-4 mb-4"><p className="text-yellow-200">Waiting for host...</p></div>}
-        {fuStatus === "approved" && <div className="bg-green-500/30 border border-green-400 rounded-xl p-4 mb-4"><p className="text-green-200">✓ Continue!</p></div>}
-        {fuStatus === "declined" && <div className="bg-red-500/30 border border-red-400 rounded-xl p-4 mb-4"><p className="text-red-200">Follow-up declined</p></div>}
-        <div className="space-y-4 w-full max-w-xs">
+        <h2 className="text-3xl font-extrabold mb-2 text-center">You're Live</h2>
+        <p className="text-emerald-100 mb-8 text-center">Your voice is streaming to the room</p>
+        {fuStatus === "pending" && <div className="bg-white/15 border border-white/20 rounded-xl p-4 mb-4"><p className="text-emerald-100 text-sm">Waiting for host approval...</p></div>}
+        {fuStatus === "approved" && <div className="bg-white/20 border border-white/25 rounded-xl p-4 mb-4"><p className="text-white text-sm font-semibold">✓ You may continue</p></div>}
+        {fuStatus === "declined" && <div className="bg-red-500/25 border border-red-400/30 rounded-xl p-4 mb-4"><p className="text-red-100 text-sm">Follow-up declined</p></div>}
+        <div className="space-y-3 w-full max-w-xs">
           {fuStatus !== "pending" && (
-            <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("signal_followup", room.id); setFuStatus("pending"); }} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black">
-              <Hand size={24} /> Follow-up
+            <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("signal_followup", room.id); setFuStatus("pending"); }} className="w-full !bg-white/20 hover:!bg-white/30 !text-white border-0">
+              <Hand size={20} /> Follow-up
             </Btn>
           )}
-          <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("end_speech", room.id); stopRTC(); }} className="w-full">
-            <Square size={24} /> Done
+          <Btn v="secondary" sz="lg" onClick={() => { s.current.emit("end_speech", room.id); stopRTC(); }} className="w-full !bg-white !text-emerald-700 hover:!bg-emerald-50">
+            <Square size={20} /> Done Speaking
           </Btn>
         </div>
       </div>
@@ -1121,16 +1133,16 @@ function Attendee({ room, user, onExit }) {
   // ── Post-speech: offer to rejoin queue ──
   if (canRejoin && !inQueue) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6">
-        <Card className="max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Hand size={36} className="text-cyan-400" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+        <Card className="max-w-sm w-full text-center animate-slide-up">
+          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Hand size={28} className="text-blue-600" />
           </div>
-          <h2 className="text-2xl font-bold mb-2">Your turn ended</h2>
-          <p className="text-slate-400 mb-6">Want to ask a follow-up question?</p>
-          <div className="space-y-3">
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Your turn ended</h2>
+          <p className="text-slate-500 text-sm mb-6">Would you like to ask a follow-up?</p>
+          <div className="space-y-2.5">
             <Btn sz="lg" onClick={() => { s.current.emit("rejoin_queue", { roomId: room.id, user }); setCanRejoin(false); }} className="w-full">
-              <Hand size={20} /> Rejoin Queue (Follow-up)
+              <Hand size={18} /> Rejoin Queue
             </Btn>
             <Btn v="secondary" sz="lg" onClick={() => setCanRejoin(false)} className="w-full">
               Stay as Audience
@@ -1143,86 +1155,81 @@ function Attendee({ room, user, onExit }) {
 
   // ── Main attendee view ──
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col">
-      <header className="p-4 border-b border-white/10 bg-slate-900/80 backdrop-blur flex justify-between items-center shrink-0">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <header className="px-4 py-3 border-b border-slate-200 bg-white flex justify-between items-center shrink-0">
         <div>
-          <h1 className="font-bold text-lg">{room.name}</h1>
-          <p className="text-xs text-slate-400">
-            {room.currentSpeaker ? `${room.currentSpeaker.name} speaking` : "Stage empty"}
+          <h1 className="font-bold text-base text-slate-900">{room.name}</h1>
+          <p className="text-xs text-slate-500">
+            {room.currentSpeaker ? (
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {room.currentSpeaker.name} speaking</span>
+            ) : "Waiting for speaker"}
           </p>
         </div>
-        <Btn v="ghost" sz="sm" onClick={onExit}>Exit</Btn>
+        <Btn v="ghost" sz="sm" onClick={onExit} className="!text-slate-400">Exit</Btn>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4">
         {inQueue ? (
           /* ── In Queue View ── */
-          <div className="max-w-md mx-auto text-center">
-            {/* Queue position - prominent display */}
-            <div className="bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 rounded-2xl p-6 mb-6">
-              <p className="text-sm uppercase font-bold tracking-widest text-slate-300 mb-2">Your position</p>
-              <div className="text-8xl font-black text-cyan-500 mb-1">{qPos}</div>
-              <p className="text-slate-400 text-sm">
-                {qPos === 1 ? "🎉 You're next!" : `${qPos - 1} ${qPos - 1 === 1 ? "person" : "people"} ahead of you`}
+          <div className="max-w-md mx-auto">
+            <Card className="text-center mb-4">
+              <p className="text-xs uppercase font-semibold tracking-wider text-slate-500 mb-2">Your position</p>
+              <div className="text-7xl font-extrabold text-blue-600 mb-1">{qPos}</div>
+              <p className="text-slate-500 text-sm">
+                {qPos === 1 ? "You're next!" : `${qPos - 1} ${qPos - 1 === 1 ? "person" : "people"} ahead`}
               </p>
-              {room.queue && (
-                <div className="mt-3 text-xs text-slate-500">
-                  {room.queue.length} total in queue
-                </div>
-              )}
-            </div>
+              {room.queue && <p className="text-xs text-slate-400 mt-2">{room.queue.length} total in queue</p>}
+            </Card>
 
-            <div className="bg-slate-800/50 p-4 rounded-xl mb-6 text-left border border-slate-700">
-              <label className="text-sm text-slate-400 mb-2 block">Your question (optional)</label>
-              <textarea value={q} onChange={(e) => setQ(e.target.value)} className="w-full bg-black/50 rounded-lg p-3 text-white text-sm outline-none border border-slate-700 focus:border-cyan-500 resize-none" rows={3} placeholder="Type your question..." />
+            <Card className="mb-4">
+              <label className="text-sm font-medium text-slate-600 mb-2 block">Your question (optional)</label>
+              <textarea value={q} onChange={(e) => setQ(e.target.value)} className="w-full bg-slate-50 rounded-xl p-3 text-slate-900 text-sm outline-none border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 resize-none" rows={3} placeholder="Type your question..." />
               <Btn sz="sm" onClick={() => { if (q.trim()) { s.current.emit("submit_question", { roomId: room.id, text: q }); setQ(""); } }} className="w-full mt-3">
-                <Send size={14} /> Submit
+                <Send size={14} /> Submit Question
               </Btn>
+            </Card>
+
+            <div className="text-center mb-4">
+              <Btn v="ghost" onClick={() => s.current.emit("leave_queue", room.id)} className="!text-red-500 hover:!text-red-600 text-sm">Leave Queue</Btn>
             </div>
 
-            <Btn v="ghost" onClick={() => s.current.emit("leave_queue", room.id)}>Leave Queue</Btn>
-
-            {/* Transcript visible while waiting */}
-            <div className="mt-6">
-              <TranscriptPanel transcript={transcript} compact />
-            </div>
+            <TranscriptPanel transcript={transcript} compact />
           </div>
         ) : (
           /* ── Default Attendee View ── */
           <div className="max-w-md mx-auto">
-            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl mb-6 text-center">
-              <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl font-bold text-cyan-400">{user.name?.charAt(0)?.toUpperCase() || "?"}</span>
+            <Card className="mb-4 text-center">
+              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <span className="text-xl font-bold text-blue-600">{user.name?.charAt(0)?.toUpperCase() || "?"}</span>
               </div>
-              <h3 className="font-bold text-xl">{user.name}</h3>
+              <h3 className="font-bold text-lg text-slate-900">{user.name}</h3>
               {user.linkedin && (
                 <a
                   href={user.linkedin.startsWith("http") ? user.linkedin : `https://linkedin.com/in/${user.linkedin}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 flex items-center justify-center gap-1 text-sm mt-2"
+                  className="text-blue-500 hover:text-blue-600 flex items-center justify-center gap-1 text-sm mt-1.5"
                 >
                   <LinkedInIcon size={14} /> LinkedIn Profile
                 </a>
               )}
-            </div>
+            </Card>
 
-            <Btn sz="lg" onClick={() => s.current.emit("join_queue", { roomId: room.id, user })} className="w-full mb-8 py-6 text-lg">
-              <Mic size={24} /> Join Queue
+            <Btn sz="lg" onClick={() => s.current.emit("join_queue", { roomId: room.id, user })} className="w-full mb-6 py-4 text-base shadow-md shadow-blue-600/15">
+              <Mic size={20} /> Raise Hand to Speak
             </Btn>
 
-            <div className="text-center mb-8">
-              <p className="text-xs text-slate-500 uppercase tracking-widest mb-4">React</p>
-              <div className="flex justify-center gap-3 flex-wrap">
+            <div className="text-center mb-6">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Reactions</p>
+              <div className="flex justify-center gap-2 flex-wrap">
                 {["🔥", "❤️", "👍", "👏", "🎉", "💡"].map((e) => (
-                  <button key={e} onClick={() => s.current.emit("send_reaction", { roomId: room.id, emoji: e })} className="w-12 h-12 bg-slate-800 rounded-full text-2xl hover:bg-slate-700 active:scale-90 transition">
+                  <button key={e} onClick={() => s.current.emit("send_reaction", { roomId: room.id, emoji: e })} className="w-11 h-11 bg-white border border-slate-200 rounded-xl text-xl hover:bg-slate-50 active:scale-90 transition shadow-sm">
                     {e}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Transcript with language selector */}
             <TranscriptPanel transcript={transcript} compact />
           </div>
         )}
@@ -1240,19 +1247,21 @@ function Login({ onBack, onSwitch }) {
   const [busy, setBusy] = useState(false);
   const go = async (e) => { e.preventDefault(); setErr(""); setBusy(true); try { await login(email, pw); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <button onClick={onBack} className="mb-6 text-slate-500 hover:text-white flex items-center gap-2"><ArrowLeft size={16} /> Back</button>
-        <Logo /><p className="text-slate-400 mt-2 mb-6">Welcome back</p>
-        {err && <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-4 text-red-400 text-sm flex items-center gap-2"><AlertCircle size={16} /> {err}</div>}
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-sm w-full animate-slide-up">
+        <button onClick={onBack} className="mb-8 text-slate-400 hover:text-slate-700 flex items-center gap-2 text-sm font-medium"><ArrowLeft size={16} /> Back</button>
+        <Logo />
+        <h2 className="text-2xl font-bold text-slate-900 mt-6 mb-1">Welcome back</h2>
+        <p className="text-slate-500 mb-6 text-sm">Sign in to manage your events</p>
+        {err && <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-red-600 text-sm flex items-center gap-2"><AlertCircle size={16} /> {err}</div>}
         <form onSubmit={go} className="space-y-4">
-          <Field type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Field type="password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} required />
+          <Field label="Email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Field label="Password" type="password" placeholder="••••••••" value={pw} onChange={(e) => setPw(e.target.value)} required />
           <Btn type="submit" disabled={busy} className="w-full">{busy ? "Signing in..." : "Sign In"}</Btn>
         </form>
-        <p className="text-center text-slate-500 mt-6">No account? <button onClick={onSwitch} className="text-cyan-400 hover:underline">Sign up</button></p>
-        <div className="mt-6 pt-6 border-t border-slate-800"><p className="text-center text-slate-600 text-sm">Demo: <code className="text-cyan-500">admin@speakapp.io</code> / <code className="text-cyan-500">admin123</code></p></div>
-      </Card>
+        <p className="text-center text-slate-400 mt-6 text-sm">No account? <button onClick={onSwitch} className="text-blue-600 hover:underline font-medium">Create one</button></p>
+        <div className="mt-6 pt-6 border-t border-slate-200"><p className="text-center text-slate-400 text-xs">Demo: <code className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">admin@speakapp.io</code> / <code className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">admin123</code></p></div>
+      </div>
     </div>
   );
 }
@@ -1266,19 +1275,21 @@ function Register({ onBack, onSwitch }) {
   const [busy, setBusy] = useState(false);
   const go = async (e) => { e.preventDefault(); setErr(""); setBusy(true); try { await register(name, email, pw); } catch (e) { setErr(e.message); } finally { setBusy(false); } };
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
-        <button onClick={onBack} className="mb-6 text-slate-500 hover:text-white flex items-center gap-2"><ArrowLeft size={16} /> Back</button>
-        <Logo /><p className="text-slate-400 mt-2 mb-6">Create account</p>
-        {err && <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-4 text-red-400 text-sm flex items-center gap-2"><AlertCircle size={16} /> {err}</div>}
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="max-w-sm w-full animate-slide-up">
+        <button onClick={onBack} className="mb-8 text-slate-400 hover:text-slate-700 flex items-center gap-2 text-sm font-medium"><ArrowLeft size={16} /> Back</button>
+        <Logo />
+        <h2 className="text-2xl font-bold text-slate-900 mt-6 mb-1">Create account</h2>
+        <p className="text-slate-500 mb-6 text-sm">Start hosting events in minutes</p>
+        {err && <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-red-600 text-sm flex items-center gap-2"><AlertCircle size={16} /> {err}</div>}
         <form onSubmit={go} className="space-y-4">
-          <Field placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Field type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Field type="password" placeholder="Password (min 6)" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
+          <Field label="Full name" placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} required />
+          <Field label="Email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Field label="Password" type="password" placeholder="Min 6 characters" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
           <Btn type="submit" disabled={busy} className="w-full">{busy ? "Creating..." : "Create Account"}</Btn>
         </form>
-        <p className="text-center text-slate-500 mt-6">Have account? <button onClick={onSwitch} className="text-cyan-400 hover:underline">Sign in</button></p>
-      </Card>
+        <p className="text-center text-slate-400 mt-6 text-sm">Already have an account? <button onClick={onSwitch} className="text-blue-600 hover:underline font-medium">Sign in</button></p>
+      </div>
     </div>
   );
 }
@@ -1291,24 +1302,26 @@ function Admin({ onBack }) {
       .then((r) => r.json()).then(setStats).catch(() => {});
   }, [token]);
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
-      <header className="h-16 bg-slate-900/80 backdrop-blur border-b border-white/10 flex items-center justify-between px-6">
+    <div className="min-h-screen bg-slate-50">
+      <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
         <Logo sm />
         <Btn v="ghost" sz="sm" onClick={onBack}><ArrowLeft size={16} /> Back</Btn>
       </header>
       <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Admin</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-6">Dashboard</h1>
         <div className="grid grid-cols-3 gap-4">
           {[
-            { i: Users, l: "Users", v: stats?.totalUsers || 0 },
-            { i: Monitor, l: "Events", v: stats?.totalEvents || 0 },
-            { i: TrendingUp, l: "Active", v: stats?.activeEvents || 0 },
+            { i: Users, l: "Total Users", v: stats?.totalUsers || 0, color: "blue" },
+            { i: Monitor, l: "Events Created", v: stats?.totalEvents || 0, color: "violet" },
+            { i: TrendingUp, l: "Active Now", v: stats?.activeEvents || 0, color: "emerald" },
           ].map((x, i) => (
-            <div key={i} className="bg-slate-800/50 border border-white/10 rounded-xl p-4">
-              <x.i size={20} className="text-cyan-400 mb-2" />
-              <div className="text-2xl font-bold">{x.v}</div>
-              <div className="text-sm text-slate-400">{x.l}</div>
-            </div>
+            <Card key={i}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${x.color === "blue" ? "bg-blue-50 text-blue-600" : x.color === "violet" ? "bg-violet-50 text-violet-600" : "bg-emerald-50 text-emerald-600"}`}>
+                <x.i size={20} />
+              </div>
+              <div className="text-2xl font-bold text-slate-900">{x.v}</div>
+              <div className="text-sm text-slate-500 mt-1">{x.l}</div>
+            </Card>
           ))}
         </div>
       </div>
@@ -1321,21 +1334,22 @@ function HostSetup({ onBack, onCreate, ok }) {
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Status ok={ok} />
-      <Card className="max-w-md w-full">
-        <button onClick={onBack} className="mb-6 text-slate-500 hover:text-white flex items-center gap-2"><ArrowLeft size={16} /> Back</button>
-        <h2 className="text-2xl font-bold mb-2">Create Event</h2>
-        <p className="text-slate-400 mb-6">Set up your Q&A</p>
+      <div className="max-w-sm w-full animate-slide-up">
+        <button onClick={onBack} className="mb-8 text-slate-400 hover:text-slate-700 flex items-center gap-2 text-sm font-medium"><ArrowLeft size={16} /> Back</button>
+        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-5"><Monitor size={24} className="text-blue-600" /></div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-1">Create Event</h2>
+        <p className="text-slate-500 mb-6 text-sm">Set up your Q&A session</p>
         <div className="space-y-4">
-          <Field label="Event Name" placeholder="Tech Conference Q&A" value={name} onChange={(e) => setName(e.target.value)} />
-          <Field label="Your Name" placeholder="John Smith" value={host} onChange={(e) => setHost(e.target.value)} />
+          <Field label="Event name" placeholder="e.g. Tech Conference Q&A" value={name} onChange={(e) => setName(e.target.value)} />
+          <Field label="Your name" placeholder="e.g. Jane Smith" value={host} onChange={(e) => setHost(e.target.value)} />
           <Btn onClick={() => { if (!name.trim()) return alert("Enter event name"); onCreate({ name: name.trim(), hostName: host.trim() || "Host" }); }} disabled={!ok} className="w-full" sz="lg">
-            <Play size={20} /> Launch Event
+            <Play size={18} /> Launch Event
           </Btn>
-          {!ok && <p className="text-yellow-400 text-sm text-center">⏳ Connecting to server...</p>}
+          {!ok && <p className="text-amber-600 text-sm text-center flex items-center justify-center gap-1"><WifiOff size={14} /> Connecting to server...</p>}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1346,26 +1360,27 @@ function JoinPage({ onBack, onJoin, ok }) {
   const [linkedin, setLinkedin] = useState("");
   const [anon, setAnon] = useState(false);
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Status ok={ok} />
-      <Card className="max-w-md w-full">
-        <button onClick={onBack} className="mb-6 text-slate-500 hover:text-white flex items-center gap-2"><ArrowLeft size={16} /> Back</button>
-        <h2 className="text-2xl font-bold mb-2">Join Event</h2>
-        <p className="text-slate-400 mb-6">Enter room code</p>
+      <div className="max-w-sm w-full animate-slide-up">
+        <button onClick={onBack} className="mb-8 text-slate-400 hover:text-slate-700 flex items-center gap-2 text-sm font-medium"><ArrowLeft size={16} /> Back</button>
+        <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center mb-5"><Smartphone size={24} className="text-violet-600" /></div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-1">Join Event</h2>
+        <p className="text-slate-500 mb-6 text-sm">Enter the room code to participate</p>
         <div className="space-y-4">
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
-            className="w-full bg-white/10 border border-white/20 p-4 text-center text-3xl font-mono uppercase text-white rounded-xl outline-none focus:border-cyan-500"
+            className="w-full bg-slate-50 border-2 border-slate-200 p-4 text-center text-3xl font-mono uppercase text-slate-900 rounded-xl outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 tracking-[0.3em]"
             placeholder="CODE"
             maxLength={4}
           />
           {!anon && (
             <>
-              <Field placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Field placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
               <div className="relative">
                 <Field
-                  placeholder="LinkedIn URL or username (optional)"
+                  placeholder="LinkedIn URL (optional)"
                   value={linkedin}
                   onChange={(e) => setLinkedin(e.target.value)}
                 />
@@ -1373,8 +1388,8 @@ function JoinPage({ onBack, onJoin, ok }) {
               </div>
             </>
           )}
-          <label className="flex items-center gap-3 text-sm text-slate-400 cursor-pointer">
-            <input type="checkbox" checked={anon} onChange={(e) => setAnon(e.target.checked)} className="w-4 h-4 rounded" />
+          <label className="flex items-center gap-3 text-sm text-slate-500 cursor-pointer select-none">
+            <input type="checkbox" checked={anon} onChange={(e) => setAnon(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
             Join anonymously
           </label>
           <Btn onClick={() => {
@@ -1386,9 +1401,9 @@ function JoinPage({ onBack, onJoin, ok }) {
           }} disabled={!ok} className="w-full" sz="lg">
             Enter Room
           </Btn>
-          {!ok && <p className="text-yellow-400 text-sm text-center">⏳ Connecting to server...</p>}
+          {!ok && <p className="text-amber-600 text-sm text-center flex items-center justify-center gap-1"><WifiOff size={14} /> Connecting to server...</p>}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -1397,35 +1412,53 @@ function JoinPage({ onBack, onJoin, ok }) {
 function Landing({ ok, nav }) {
   const { user, logout } = useAuth();
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-white flex flex-col">
       <Status ok={ok} />
-      <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px]" />
-      <nav className="absolute top-0 w-full p-4 md:p-6 flex justify-between items-center z-10">
+      {/* Nav */}
+      <nav className="w-full px-6 py-4 flex justify-between items-center max-w-6xl mx-auto">
         <Logo />
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              {["admin", "superadmin"].includes(user.role) && <Btn v="ghost" sz="sm" onClick={() => nav("admin")}><BarChart3 size={16} /></Btn>}
-              <span className="text-slate-400 text-sm hidden sm:inline">{user.name}</span>
+              {["admin", "superadmin"].includes(user.role) && <Btn v="ghost" sz="sm" onClick={() => nav("admin")}><BarChart3 size={16} /> Admin</Btn>}
+              <span className="text-slate-500 text-sm hidden sm:inline">{user.name}</span>
               <Btn v="ghost" sz="sm" onClick={logout}><LogOut size={16} /></Btn>
             </>
           ) : (
-            <Btn v="ghost" sz="sm" onClick={() => nav("login")}><LogIn size={16} /></Btn>
+            <Btn v="ghost" sz="sm" onClick={() => nav("login")}><LogIn size={16} /> Sign in</Btn>
           )}
         </div>
       </nav>
-      <div className="relative z-10 text-center max-w-2xl px-4">
-        <div className="inline-block px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-wider mb-6">Conference Q&A</div>
-        <h1 className="text-4xl md:text-7xl font-black tracking-tighter mb-6">
-          Speak<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">App</span>
-        </h1>
-        <p className="text-lg md:text-xl text-slate-400 mb-10">
-          Real-time Q&A with WebRTC audio streaming.<br className="hidden md:block" />No app downloads required.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Btn sz="lg" onClick={() => nav("host")}><Monitor size={20} /> Host Event</Btn>
-          <Btn v="secondary" sz="lg" onClick={() => nav("join")}><Smartphone size={20} /> Join Event</Btn>
+
+      {/* Hero */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
+        <div className="animate-slide-up text-center max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-sm font-medium mb-8">
+            <Mic size={14} />
+            Real-time conference Q&A platform
+          </div>
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-5 leading-[1.1]">
+            Every voice<br />
+            <span className="text-blue-600">deserves to be heard</span>
+          </h1>
+          <p className="text-lg md:text-xl text-slate-500 mb-10 max-w-lg mx-auto leading-relaxed">
+            Stream audio directly from phones to venue speakers. No app downloads, no microphone queues. Just scan & speak.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Btn sz="lg" onClick={() => nav("host")} className="px-8 py-3.5 text-base shadow-md shadow-blue-600/20">
+              <Monitor size={18} /> Host an Event
+            </Btn>
+            <Btn v="outline" sz="lg" onClick={() => nav("join")} className="px-8 py-3.5 text-base">
+              <Smartphone size={18} /> Join Event
+            </Btn>
+          </div>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-slate-400">
+          <div className="flex items-center gap-2"><Globe size={16} className="text-blue-500" /> 27 languages</div>
+          <div className="flex items-center gap-2"><Wifi size={16} className="text-emerald-500" /> WebRTC audio</div>
+          <div className="flex items-center gap-2"><Users size={16} className="text-violet-500" /> No app needed</div>
         </div>
       </div>
     </div>
