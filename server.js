@@ -27,100 +27,302 @@ Object.values(naughtyWords).forEach(list => {
   if (Array.isArray(list)) list.forEach(w => { if (w && w.length >= 2) PROFANITY.add(w.toLowerCase().trim()); });
 });
 
-// Add European languages missing from the package
+// Add European languages missing from the package + English derivatives
 const extraWords = [
-  // Romanian
-  'pula','pizdă','pizda','futui','dracu','căcat','cacat','curva','muie','coaie','bulangiu','labagiu','sugipula','dracului',
-  // Bulgarian
-  'шибан','путка','майната','курва','мамка','педал','гъз','лайно','дупе','копеле',
-  // Croatian / Serbian / Bosnian
-  'jebem','kurac','pička','picka','sranje','kurva','govno','jebote','drolja','šupak','supak','seljačino',
-  // Slovak
-  'kurva','piča','pica','jebať','jebat','kokot','čurák','curak','hovno','sráč','srac','deboš','robiť dobre',
-  // Slovenian
-  'kurba','pizda','jebati','kurac','sranje','fuka','pofukana','mater','zajebi',
-  // Estonian
-  'kurat','türa','perse','munn','jobu','lits','nussima','sitt','raisk',
-  // Latvian
-  'dirsā','dirsa','pīzda','pizda','sūds','suds','kuce','pidars','mauka',
-  // Lithuanian
-  'šūdas','sudas','bybys','kalė','kale','pyzda','rupūžė','rupuze','subinė','subine',
-  // Greek (additional)
-  'γαμώ','gamo','μαλάκα','malaka','πούτσα','poutsa','σκατά','skata','πουτάνα','poutana','αρχίδι','archidi','μουνί','mouni','καριόλα','kariola','γαμημένε','gamimene',
-  // Ukrainian (additional)
-  'блядь','бляді','хуй','курва','сука','залупа','дрочити','їбати',
-  // Luxembourgish
-  'schäissdrek','dreck','leck','houermamm','arschlach','vollidiott',
-  // Icelandic
-  'fokk','helvíti','andskotinn','rassgat','drullusessa','drusla',
-  // Albanian
-  'qifsha','mut','kar','pidh','bythë','bythe','kurvë','kurve','robqir',
-  // Catalan
-  'filla de puta','collons','cony','merda','carall','puta','cabró','cabro',
-  // Basque
-  'kakazaharra','putakumea','txakurra',
-  // Welsh
-  'cachu','cont','twll din',
-  // Irish
-  'focal','cac','amadán','amadan',
-  // Maltese
-  'ħanina','qaħba','ostja',
-  // Galician
-  'foder','merda','carallo','puta','fillo de puta',
-  // Macedonian
-  'курва','пичка','говно','мајката','ебам',
-  // Belarusian
-  'сука','блядзь','хуй','гаўно',
-  // Georgian
-  'შენი დედა','ტრაკი','მომიტყან',
-  // Armenian
-  'բdelays','քdelays',
-  // Afrikaans
-  'poes','naai','doos','kak','fok','bliksem','moer','vokken',
-  // Swahili
-  'malaya','matako','shenzi','kumamako',
-  // Hindi (transliterated)
-  'bhenchod','madarchod','chutiya','gaand','bhosdike','randi','harami','lauda','lund',
-  // Portuguese (Brazilian additions)
-  'foda-se','piranha','viado','arrombado','cuzão','cuzao','otário','otario',
-  // Arabic (transliterated)
-  'kuss','sharmouta','ibn el sharmouta','ahbal','teez',
+  // English derivatives the package misses
+  'fucker','fuckers','fucked','fucks','fuking','fking','fck','fuk','stfu','gtfo','lmfao',
+  'shithead','shitface','shithole','shitstain','bullshitter','dipshit','horseshit','apeshit',
+  'asshat','asswipe','buttfuck','clusterfuck','mindfuck','skullfuck',
+  'cocksucker','dickhead','dickwad','douchebag','douche',
+  'boner','blowjob','handjob','rimjob','circlejerk',
+  'whoring','slutty','slutbag',
+  'bitchy','bitches','bitching','sonofabitch',
+  'nigga','niggas','nigg3r','n1gger','n1gga',
+  'retard','retarded',
+
+  // ═══ Romanian (ro) - COMPREHENSIVE ═══
+  'pula','pulă','pizda','pizdă','fut','futut','futu-ți','fututi','futai','muie','muist',
+  'căcat','cacat','rahat','cur','curva','curvă','curvistina','coaie','coaiele',
+  'bulangiu','labagiu','sugipula','dracului','drace','prostituată','prostituata',
+  'nenorocit','nenorocită','nenorocita','poponar','bou','idiot','imbecil','cretin',
+  'tarfa','tâmpit','tampit','fraier','pizdulice','pularau','mamă-ta','mama-ta',
+  'morții tăi','mortii tai','morții mă-tii','suge-o','sugeo','du-te dracu',
+  'pizda mă-tii','bagă-mi-aș','bagamias','futu-ți morții','căcăcios','cacacios',
+  'pizdos','pulangiu','scârbos','scarbos','împuțit','imputit','gunoi',
+  'jigodie','javră','javra','lichea','mizerabil','nenoroc','laba','labă',
+
+  // ═══ Greek (el) - COMPREHENSIVE ═══
+  'γαμώ','γαμω','γαμήσου','γαμησου','γαμημένε','γαμημενε','γαμημένο','γαμημενο',
+  'μαλάκα','μαλακα','μαλάκας','μαλακας','μαλακία','μαλακια','μαλακισμένος','μαλακισμενος',
+  'πούτσα','πουτσα','πούτσο','πουτσο','πουτάνα','πουτανα','πουτανιό','πουτανιο',
+  'σκατά','σκατα','σκατό','σκατο','σκατοφάτσα','σκατοφατσα','σκατόψυχος','σκατοψυχος',
+  'αρχίδι','αρχιδι','αρχίδια','αρχιδια','αρχιδάτος','αρχιδατος',
+  'μουνί','μουνι','μουνιά','μουνια','μουνόπανο','μουνοπανο',
+  'καριόλα','καριολα','καριόλης','καριολης','καθίκι','καθικι',
+  'βρωμιάρα','βρωμιαρα','βρωμιάρης','βρωμιαρης','πούστη','πουστη',
+  'πούστης','πουστης','κωλοτρυπίδα','κωλοτρυπιδα','κωλοβάρα','κωλοβαρα',
+  'κωλαράκος','κωλαρακος','πιπόνι','πιπονι','πιπίνι','πιπινι',
+  'βύζια','βυζια','βυζάρα','βυζαρα','πρωκτός','πρωκτος',
+  'gamo','malaka','poutana','skata','arhidi','mouni','kariola','pousti',
+  'gamiso','gamimene','mounopano','skatomouni','gamisou',
+
+  // ═══ Bulgarian (bg) - COMPREHENSIVE ═══
+  'еба','ебал','ебаще','ебати','ебаняк','ебах','ебеш',
+  'путка','путки','курва','курви','шибан','шибана','шибано','шибаняк',
+  'мамка','мамкаму','мамкати','майната','майнатати',
+  'педал','педали','педераст','педерас','гъз','газ',
+  'лайно','лайна','лайнар','лайняк','дупе','дупка','дупета',
+  'копеле','копелдак','простак','простачка','глупак','идиот',
+  'пикая','пикаеш','пикня','лайнарка','куче','кучка',
+  'мърша','мръсница','мършав','мазник','мазна',
+  'боклук','боклуци','смрад','смрадлив','смрадливец',
+
+  // ═══ Croatian / Serbian / Bosnian (hr) - COMPREHENSIVE ═══
+  'jebem','jebati','jebiga','jebote','jebanje','jebo','jebala','jebač','jebac',
+  'kurac','kurčina','kurcina','kurceva','pička','picka','pičkica','pickica',
+  'sranje','srat','sranje','srao','usrao','posrao','usrana',
+  'kurva','kurve','kurvanje','kurvetina','govno','govnar','govnarija','govnara',
+  'drolja','šljiva','sljiva','šupak','supak','šupčina','supcina',
+  'seljačino','seljacino','kreten','kretenu','idiot','budala','budalo',
+  'mamicu ti','majku ti','jebem ti majku','jebem ti mater',
+  'pizda','pizdek','pizdun','pizdunjara',
+  'fukara','šonja','sonja','debil','debilu','glupan','glupane',
+  'konjino','konju','magarac','magarče','smeće','smece',
+
+  // ═══ Slovak (sk) - COMPREHENSIVE ═══
+  'kurva','kurvy','kurvin','jebať','jebat','jebem','jebnutý','jebnuty',
+  'piča','pica','pičoviny','picoviny','kokot','kokotina','kokoti',
+  'čurák','curak','čurina','curina','hovno','hovná','hovna','hovnivál','hovnival',
+  'sráč','srac','srať','srat','zasraný','zasrany','posrať','posrat',
+  'debil','debilný','debilny','kretén','kreten','idiot','blbec','blb',
+  'hajzel','hajzlík','hajzlik','dement','dementi',
+  'mrdať','mrdat','mrdka','zmrd','zmrdi','zmrdovi',
+  'šľapka','slapka','štetka','stetka','kurvik','pobehlica',
+  'prasa','prašivý','prasivy','hovädina','hovadina',
+
+  // ═══ Slovenian (sl) - COMPREHENSIVE ═══
+  'kurba','kurbe','kurac','kurec','jebati','jebem','jebiga',
+  'pizda','pizdek','pizdun','sranje','srat','usrat','zasran',
+  'drek','dreka','drekov','fukati','fuka','pofukana','pofukan',
+  'zajebi','zajebavat','zajebancija','mater','v materino','mamina',
+  'prasica','prasec','svinja','kreten','idiot','debil',
+  'peder','pedercek','kurvin','kurbin','skurjen',
+  'govnar','govno','dristati','dristje','smrad','smrdljiv',
+  'tepec','bedak','bedakov','butec','butelj',
+
+  // ═══ Estonian (et) - COMPREHENSIVE ═══
+  'kurat','krt','kuradi','kuradima','kuratlik',
+  'türa','tura','türapea','turapea','türanahk','turanahk',
+  'perse','perses','persse','persevest','perseauk',
+  'munn','munni','munnike','keps','kepsti','kepime',
+  'jobu','jobukas','nussima','nussida','nussi',
+  'lits','litsi','litslik','hoor','hooratama',
+  'sitt','sitta','sittunud','pask','paska','paskane',
+  'raisk','raisapea','kuu','kuuse','loll','lollike',
+  'tölp','tolp','idioot','debiilik','debiil',
+  'nõme','nome','tibla','kretiin','kretiinlik',
+
+  // ═══ Latvian (lv) - COMPREHENSIVE ═══
+  'dirsā','dirsa','dirsai','dirsēt','dirset','dirsāt','dirsat',
+  'pīzda','pizda','pīzdec','pizdec','pīzdīt','pizdit','pīzdiens','pizdiens',
+  'sūdā','suda','sūds','suds','sasūdīt','sasudit',
+  'kuce','kuces','kucēns','kucens','kuča','kuca',
+  'pidars','pidari','pidarasts','pidarast','pidarass',
+  'mauka','maukas','mauka','maukošana','maukosana',
+  'dirst','dirsties','piedirst','piedirsi',
+  'draņķis','drankis','draņķīgs','drankigs',
+  'muļķis','mulkis','debīls','debils','idiots',
+  'pakaļa','pakala','pakaļā','pakala',
+  'pists','pistā','pista','pisties','izpist',
+
+  // ═══ Lithuanian (lt) - COMPREHENSIVE ═══
+  'šūdas','sudas','šūdo','sudo','šūdžius','sudzius','šūdinus','sudinus',
+  'bybys','bybio','bybi','bybipalaikis',
+  'kalė','kale','kalės','kales','kalyt','kalyte',
+  'pyzda','pyzdos','pyzdec','pyzdalūpis','pyzdalupis',
+  'rupūžė','rupuze','rupūžės','rupuzes',
+  'subinė','subine','subines','subinės','subinėn','subinen',
+  'pist','pisti','nupist','nupisti','papist','papisti',
+  'nusimaut','mautyti','maut','nusimautyti',
+  'krūtys','krutys','krūtines','krutines',
+  'debil','debile','debilu','debilai',
+  'kekšė','kekse','paleistuvė','paleistuve','paleistuvis',
+  'šikna','sikna','šiknas','siknas','šiknasparys','siknasparys',
+  'blet','blemba','blyn',
+
+  // ═══ Ukrainian (uk) - COMPREHENSIVE ═══
+  'блядь','бляді','блядськи','бляха','бляхамуха',
+  'хуй','хуя','хує','хуєсос','хуїв','хуйня','хуйло',
+  'курва','курви','курвин','курвисько',
+  'сука','суки','сучка','сучий','сучара',
+  'залупа','залупний','залупитись',
+  'дрочити','дрочила','дрочун',
+  'їбати','їбаний','їбанько','їбать','їбальник',
+  'пизда','піздюк','піздец','піздити','піздюлі',
+  'мудак','мудила','мудозвін','мудозвон',
+  'сраний','сранка','сратися','засранець','засранка',
+  'лайно','гівно','гівнюк','гівняк',
+  'дупа','жопа','жопний','жопастий',
+  'підар','підарас','підарасина',
+  'падлюка','потвора','виродок','покидьок',
+
+  // ═══ Luxembourgish (lb) - COMPREHENSIVE ═══
+  'schäissdrek','schäiss','scheiss','dreck','drecksau','dreckig',
+  'leck','leck mech','lecken','houermamm','houer','houerkand',
+  'arschlach','arschloch','aaschlach','vollidiott','idiot',
+  'fotze','fotz','kackbratze','kack','kacken',
+  'wichser','wichsen','hurensohn','huresohn',
+  'fick','ficken','gefickt','fickdech','fickdechen',
+  'schwéng','schwanz','piss','pissen','angepisst',
+  'depp','dummkapp','neisel','schnull','schnëssen',
+  'mëscht','mischt','stronz','kutz','kutzig',
+
+  // ═══ Missing words from package verification ═══
+  // Spanish
+  'joder','jodido','jodidos','jódete','jodete','coger','chingada','chingado','verga','vergón','vergon',
+  // Dutch
+  'kanker','kankeren','kankerlijer','tyfuslijer','teringlijer','pokkelijer',
+  // Swedish
+  'jävla','jävlar','jävel','skit','skita','skitsnack','hora','horor','horunge','kuksugare','fittkärring',
+  // Danish
+  'fanden','for fanden','pisse','luder','røvhul','kraftidiot',
+  // Finnish
+  'saatana','saatanan','jumalauta','helvetti','paskahousu','mulkku','pillu','huora',
+  // Czech
+  'píča','pičus','zmrd','vole','hajzl','kurváhoř','zkurvenej','zasranej',
+  // Hungarian
+  'baszd','baszni','baszás','baszmeg','baszódj','bazdmeg','gecis','szaros','fasszopó',
+  // Turkish
+  'amına','amina','amk','amcık','amcik','yarrak','yarrağ','yarram','yarramı','orosbuçocuğu','ibne','götveren',
+  // French additional
+  'putain de mère','fils de pute','va te faire foutre','nique ta mère','ta gueule',
+  // German additional  
+  'scheiß','scheiss','verdammt','verfickt','wichse','schwuchtel','missgeburt',
 ].map(w => w.toLowerCase().trim());
 
 extraWords.forEach(w => { if (w.length >= 2) PROFANITY.add(w); });
 
 console.log(`🚫 Profanity filter loaded: ${PROFANITY.size} words across 40+ languages`);
 
+// Common compound patterns: "[word] fucker", "[word] shit", etc.
+const PROFANITY_SUFFIXES = ['fucker','fucking','shit','shitting','ass','hole','sucker','head','face','bag','wipe','tard'];
+const PROFANITY_PREFIXES = ['mother','sister','brother','father','bull','horse','dumb','jack','smart','dog','rat','butt','shit','ass','cock'];
+
+// Safe words that should NEVER be filtered (common false positives)
+const SAFELIST = new Set([
+  'ashley','ass','assume','assault','assemble','assembly','assert','assertion','assess','assessment',
+  'asset','assets','assign','assignment','assist','assistant','associate','association',
+  'class','classic','classical','classification','classified','classify','classroom',
+  'brass','grass','glass','mass','massive','pass','passage','passenger','passing','passion','passionate',
+  'compass','embarrass','embassy','harass','harassment',
+  'bass','bassoon','ambassador',
+  'cocktail','cockpit','cockatoo','peacock','hancock','woodcock',
+  'scunthorpe','sussex','essex','middlesex',
+  'therapist','analyst','organism','title','button','document',
+  'dick','dickens','dickson','dictionary',
+  'beaver','dam','hell','hello','damn','dammit',
+  'piss','pistol','piston','piste',
+  'shitake','shiitake',
+  'condom','condolence','condition','conduct','conference','confide','confident',
+  'country','count','counter','counsel','county',
+  'custom','customer','custody',
+  'execute','execution','executive',
+  'homosexual','bisexual','sexual','sexuality',
+  'analysis','analyst','analyze',
+  'angina','regina','vagina',
+  'arsenal','semen','semester','seminar','penthouse','penalty','penetrate',
+  'cumulative','accumulate','cucumber','document','circumstance',
+  'happiness','happiest','therapist',
+  'bigger','digger','trigger','snigger','nigger', // keep the safe versions
+  'putter','butter','gutter','cutter','mutter','nutter','stutter','sputter','clutter','flutter','shutter','utter',
+  'hooker', // surname
+  'con','concern','concept','conclude','conclusion','concrete','consent','consider','consist','constant',
+  'fan','fancy','fantastic','fantasy','fandom',
+  'sex','sexist','sexism',
+  'hoe','hoer','shoe','shoer',
+  'tit','title','titan','titanium',
+  'pik','pike','spike',
+  'kuk','kuku','kukui',
+  'lul','lull','lullaby',
+]);
+
 function filterProfanity(text) {
   let beeped = false;
-  const words = text.split(/(\s+)/);
   
-  const result = words.map(word => {
-    // Strip punctuation for matching
-    const clean = word.toLowerCase().replace(/[.,!?;:'"()\-_]/g, '');
-    if (clean.length >= 2 && PROFANITY.has(clean)) {
-      beeped = true;
-      const punct = word.match(/[.,!?;:'"()\-_]+$/)?.[0] || '';
-      const core = word.slice(0, word.length - punct.length);
-      return core[0] + '*'.repeat(Math.max(core.length - 1, 1)) + punct;
-    }
-    // Also check multi-word phrases (2-word combos)
-    return word;
-  }).join('');
-  
-  // Check multi-word phrases
-  const lowerText = text.toLowerCase();
+  // STEP 1: Check multi-word phrases first (e.g. "hijo de puta", "son of a bitch")
+  let result = text;
+  const lowerFull = text.toLowerCase();
   for (const phrase of PROFANITY) {
-    if (phrase.includes(' ') && lowerText.includes(phrase)) {
+    if (phrase.includes(' ') && lowerFull.includes(phrase)) {
       beeped = true;
-      // Replace the phrase keeping case
       const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      const filtered = result.replace(regex, (match) => match[0] + '*'.repeat(match.length - 1));
-      return { text: filtered, beeped };
+      result = result.replace(regex, (m) => m[0] + '*'.repeat(m.length - 1));
     }
   }
   
-  return { text: result, beeped };
+  // STEP 2: Check individual words
+  const tokens = result.split(/(\s+)/);
+  const filtered = tokens.map(word => {
+    if (!word.trim()) return word; // whitespace
+    
+    const clean = word.toLowerCase().replace(/[.,!?;:'"()\-_!@#$%^&*]/g, '');
+    if (clean.length < 2) return word;
+    
+    // Skip safe words
+    if (SAFELIST.has(clean)) return word;
+    
+    // Exact match
+    if (PROFANITY.has(clean)) {
+      beeped = true;
+      const punct = word.match(/[.,!?;:'"()\-_!@#$%^&*]+$/)?.[0] || '';
+      const core = word.slice(0, word.length - punct.length);
+      return core[0] + '*'.repeat(Math.max(core.length - 1, 1)) + punct;
+    }
+    
+    // Compound check: "motherfucker", "sisterfucker", "bullshit" etc.
+    const lower = clean;
+    for (const suffix of PROFANITY_SUFFIXES) {
+      if (lower.endsWith(suffix) && lower.length > suffix.length) {
+        const prefix = lower.slice(0, lower.length - suffix.length);
+        if (PROFANITY_PREFIXES.includes(prefix) || PROFANITY.has(prefix)) {
+          beeped = true;
+          const punct = word.match(/[.,!?;:'"()\-_!@#$%^&*]+$/)?.[0] || '';
+          const core = word.slice(0, word.length - punct.length);
+          return core[0] + '*'.repeat(Math.max(core.length - 1, 1)) + punct;
+        }
+      }
+    }
+    for (const prefix of PROFANITY_PREFIXES) {
+      if (lower.startsWith(prefix) && PROFANITY.has(lower.slice(prefix.length))) {
+        beeped = true;
+        const punct = word.match(/[.,!?;:'"()\-_!@#$%^&*]+$/)?.[0] || '';
+        const core = word.slice(0, word.length - punct.length);
+        return core[0] + '*'.repeat(Math.max(core.length - 1, 1)) + punct;
+        }
+    }
+    
+    return word;
+  }).join('');
+  
+  // STEP 3: Check two-word combos like "mother fucker", "son of bitch"
+  const wordList = text.toLowerCase().split(/\s+/);
+  for (let i = 0; i < wordList.length - 1; i++) {
+    const combo = wordList[i] + wordList[i + 1];
+    // Check if combined is a known bad word
+    if (PROFANITY.has(combo)) {
+      beeped = true;
+      // Replace both words in result
+      const regex = new RegExp(`(${wordList[i]})(\\s+)(${wordList[i + 1]})`, 'gi');
+      filtered.replace(regex, (m, w1, space, w2) => w1[0] + '*'.repeat(w1.length - 1) + space + w2[0] + '*'.repeat(w2.length - 1));
+    }
+    // "mother fucker" -> check if word2 is profane on its own
+    const w2clean = wordList[i + 1].replace(/[.,!?;:'"()\-_]/g, '');
+    if (PROFANITY.has(w2clean) && !SAFELIST.has(w2clean)) {
+      // Already caught in step 2
+    }
+  }
+  
+  return { text: filtered, beeped };
 }
 
 async function seedAdmin() {
