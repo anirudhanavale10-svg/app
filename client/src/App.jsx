@@ -84,72 +84,43 @@ const LANGUAGES = [
 // Translation queue to avoid rate limiting
 let translateQueue = Promise.resolve();
 
-// Google Translate (unofficial, no key needed, best quality)
-async function googleTranslate(text, targetLang) {
-  const tl = targetLang === "no" ? "no" : targetLang === "lb" ? "de" : targetLang;
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Google failed");
-  const d = await r.json();
-  // Response format: [[["translated text","original text",null,null,10]]]
-  if (d && d[0]) {
-    return d[0].map((s) => s[0]).join("");
-  }
-  throw new Error("No result");
-}
-
-// LibreTranslate (free public instance, good quality)
-async function libreTranslate(text, targetLang) {
-  const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
-  const r = await fetch("https://libretranslate.com/translate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ q: text, source: "en", target: tl }),
-  });
-  if (!r.ok) throw new Error("Libre failed");
-  const d = await r.json();
-  if (d.translatedText) return d.translatedText;
-  throw new Error("No result");
-}
-
-// MyMemory (fallback, decent quality)
-async function myMemoryTranslate(text, targetLang) {
-  const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
-  const r = await fetch(
-    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
-  );
-  if (!r.ok) throw new Error("MyMemory failed");
-  const d = await r.json();
-  const result = d.responseData?.translatedText;
-  if (result && !result.includes("MYMEMORY WARNING") && result.toLowerCase() !== text.toLowerCase()) {
-    return result;
-  }
-  throw new Error("No result");
-}
-
 async function translateText(text, targetLang) {
   if (!text || targetLang === "en") return text;
 
-  // Queue translations to avoid rate limits
   const result = await new Promise((resolve) => {
     translateQueue = translateQueue.then(async () => {
       await new Promise((r) => setTimeout(r, 100));
       try {
-        // Try Google first (best quality)
-        const t = await googleTranslate(text, targetLang);
-        if (t && t.toLowerCase() !== text.toLowerCase()) { resolve(t); return; }
+        // Use server-side proxy to avoid CORS issues
+        const r = await fetch(`${API}/api/translate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, target: targetLang }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          if (d.translated && d.translated.toLowerCase() !== text.toLowerCase()) {
+            resolve(d.translated);
+            return;
+          }
+        }
       } catch {}
+      // Fallback: MyMemory direct (CORS-friendly)
       try {
-        // Fallback: LibreTranslate
-        const t = await libreTranslate(text, targetLang);
-        if (t && t.toLowerCase() !== text.toLowerCase()) { resolve(t); return; }
+        const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
+        const r = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
+        );
+        if (r.ok) {
+          const d = await r.json();
+          const result = d.responseData?.translatedText;
+          if (result && !result.includes("MYMEMORY WARNING") && result.toLowerCase() !== text.toLowerCase()) {
+            resolve(result);
+            return;
+          }
+        }
       } catch {}
-      try {
-        // Last resort: MyMemory
-        const t = await myMemoryTranslate(text, targetLang);
-        if (t) { resolve(t); return; }
-      } catch {}
-      resolve(text); // All failed, return original
+      resolve(text);
     });
   });
   return result;
@@ -286,9 +257,10 @@ function speakText(text, langCode) {
   if (!text || !window.speechSynthesis) return;
   // Cancel any ongoing speech
   window.speechSynthesis.cancel();
+  
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = TTS_LANG_MAP[langCode] || langCode;
-  utter.rate = 0.9; // Slightly slower for clarity
+  utter.rate = 0.9;
   utter.pitch = 1.0;
   utter.volume = 1.0;
 
@@ -304,6 +276,26 @@ function speakText(text, langCode) {
   utter.voice = googleVoice || msVoice || anyVoice || null;
 
   window.speechSynthesis.speak(utter);
+}
+
+// Unlock speechSynthesis on mobile (requires user gesture)
+function unlockTTS(langCode) {
+  if (!window.speechSynthesis) return;
+  const utter = new SpeechSynthesisUtterance("");
+  utter.lang = TTS_LANG_MAP[langCode] || langCode;
+  utter.volume = 0; // silent
+  window.speechSynthesis.speak(utter);
+  
+  // Also play a tiny silent audio to unlock AudioContext on iOS
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    setTimeout(() => ctx.close(), 100);
+  } catch {}
 }
 
 // ─── Transcript Panel (shared between Host & Attendee) ───────────────────────
@@ -393,7 +385,23 @@ function TranscriptPanel({ transcript, compact = false }) {
           {/* Audio translation toggle - only show when non-English selected */}
           {lang !== "en" && (
             <button
-              onClick={() => setAudioTranslation(!audioTranslation)}
+              onClick={() => {
+                const next = !audioTranslation;
+                setAudioTranslation(next);
+                if (next) {
+                  unlockTTS(lang);
+                  // Speak a test phrase to confirm it's working
+                  setTimeout(() => speakText(
+                    lang === "fr" ? "Traduction audio activée" :
+                    lang === "de" ? "Audio-Übersetzung aktiviert" :
+                    lang === "es" ? "Traducción de audio activada" :
+                    lang === "it" ? "Traduzione audio attivata" :
+                    "Audio translation on"
+                  , lang), 300);
+                } else {
+                  if (window.speechSynthesis) window.speechSynthesis.cancel();
+                }
+              }}
               className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all ${
                 audioTranslation
                   ? "bg-green-500/20 text-green-400 border border-green-500/50"

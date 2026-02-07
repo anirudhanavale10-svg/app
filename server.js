@@ -80,6 +80,50 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', rooms: rooms.size, users: users.size, uptime: Math.floor(process.uptime()) });
 });
 
+// Translation proxy (avoids CORS issues with Google Translate)
+app.post('/api/translate', async (req, res) => {
+  try {
+    const { text, target } = req.body;
+    if (!text || !target) return res.status(400).json({ error: 'text and target required' });
+    
+    const tl = target === 'no' ? 'no' : target === 'lb' ? 'de' : target;
+    
+    // Try Google Translate first (best quality)
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${tl}&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`;
+      const gRes = await fetch(url);
+      if (gRes.ok) {
+        const d = await gRes.json();
+        if (d && d[0]) {
+          const translated = d[0].map(s => s[0]).join('');
+          if (translated && translated.toLowerCase() !== text.toLowerCase()) {
+            return res.json({ translated, source: 'google' });
+          }
+        }
+      }
+    } catch (e) { console.log('Google translate failed:', e.message); }
+
+    // Fallback: MyMemory
+    try {
+      const mmTl = target === 'no' ? 'nb' : target === 'lb' ? 'de' : target;
+      const mmRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${mmTl}&de=speakapp@conference.io`);
+      if (mmRes.ok) {
+        const d = await mmRes.json();
+        const result = d.responseData?.translatedText;
+        if (result && !result.includes('MYMEMORY WARNING') && result.toLowerCase() !== text.toLowerCase()) {
+          return res.json({ translated: result, source: 'mymemory' });
+        }
+      }
+    } catch (e) { console.log('MyMemory failed:', e.message); }
+
+    // All failed
+    res.json({ translated: text, source: 'none' });
+  } catch (e) {
+    console.error('Translation error:', e);
+    res.json({ translated: req.body?.text || '', source: 'error' });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
