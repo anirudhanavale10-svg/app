@@ -327,14 +327,12 @@ function TranscriptPanel({ transcript, compact = false }) {
     const toTranslate = transcript.filter((e) => !translated[`${e.id}-${lang}`]);
     if (toTranslate.length === 0) return;
 
-    // Mark as translating
     setTranslating((prev) => {
       const next = new Set(prev);
       toTranslate.forEach((e) => next.add(`${e.id}-${lang}`));
       return next;
     });
 
-    // Translate each untranslated entry
     toTranslate.forEach((e) => {
       const key = `${e.id}-${lang}`;
       translateText(e.text, lang).then((t) => {
@@ -346,8 +344,7 @@ function TranscriptPanel({ transcript, compact = false }) {
             return next;
           });
 
-          // Speak the translated text if audio translation is ON
-          if (audioTranslation && t && t !== e.text && !spokenRef.current.has(key)) {
+          if (audioTranslation && t && !spokenRef.current.has(key)) {
             spokenRef.current.add(key);
             speakText(t, lang);
           }
@@ -358,7 +355,7 @@ function TranscriptPanel({ transcript, compact = false }) {
     return () => { cancelled = true; };
   }, [lang, transcript.length, audioTranslation]);
 
-  // Stop speech when audio translation is turned off or language changes
+  // Stop speech when audio is turned off or language changes
   useEffect(() => {
     if (!audioTranslation && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -382,7 +379,7 @@ function TranscriptPanel({ transcript, compact = false }) {
           {transcript.length > 0 && <span className="text-green-400 text-xs animate-pulse">● LIVE</span>}
         </h3>
         <div className="flex items-center gap-2">
-          {/* Audio translation toggle - only show when non-English selected */}
+          {/* Audio TTS toggle - only for non-English (English users hear via room speakers) */}
           {lang !== "en" && (
             <button
               onClick={() => {
@@ -390,13 +387,14 @@ function TranscriptPanel({ transcript, compact = false }) {
                 setAudioTranslation(next);
                 if (next) {
                   unlockTTS(lang);
-                  // Speak a test phrase to confirm it's working
                   setTimeout(() => speakText(
-                    lang === "fr" ? "Traduction audio activée" :
-                    lang === "de" ? "Audio-Übersetzung aktiviert" :
-                    lang === "es" ? "Traducción de audio activada" :
-                    lang === "it" ? "Traduzione audio attivata" :
-                    "Audio translation on"
+                    lang === "fr" ? "Audio activé" :
+                    lang === "de" ? "Audio aktiviert" :
+                    lang === "es" ? "Audio activado" :
+                    lang === "it" ? "Audio attivato" :
+                    lang === "pt" ? "Áudio ativado" :
+                    lang === "nl" ? "Audio aan" :
+                    "Audio on"
                   , lang), 300);
                 } else {
                   if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -407,7 +405,7 @@ function TranscriptPanel({ transcript, compact = false }) {
                   ? "bg-green-500/20 text-green-400 border border-green-500/50"
                   : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-white"
               }`}
-              title={audioTranslation ? "Audio translation ON - click to mute" : "Click to hear translations spoken aloud"}
+              title={audioTranslation ? "Audio ON - click to mute" : "Hear transcript in your language"}
             >
               {audioTranslation ? <Volume2 size={12} /> : <VolumeX size={12} />}
               {audioTranslation ? "🔊 Audio ON" : "🔇 Audio"}
@@ -419,7 +417,7 @@ function TranscriptPanel({ transcript, compact = false }) {
       {lang !== "en" && (
         <div className="mb-2 text-xs text-cyan-400/70 flex items-center gap-1">
           <Globe size={10} /> Translating to {LANGUAGES.find((l) => l.code === lang)?.label || lang}
-          {audioTranslation && <span className="text-green-400 ml-1">• Audio active</span>}
+          {audioTranslation && <span className="text-green-400 ml-1">• 🔊 Audio active</span>}
         </div>
       )}
       <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-2 ${compact ? "max-h-40" : "max-h-[50vh]"}`}>
