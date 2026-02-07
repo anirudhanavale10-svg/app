@@ -796,17 +796,17 @@ function HostDash({ room, onEnd }) {
 
       {/* Audio blocked banner */}
       {audioBlocked && (
-        <div className="fixed top-14 left-0 right-0 z-50 bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2.5 flex items-center justify-center gap-4">
-          <span className="font-medium text-sm">Browser blocked audio playback</span>
-          <button onClick={enableAudio} className="bg-amber-600 text-white px-3 py-1 rounded-lg font-semibold text-xs hover:bg-amber-700 transition">Enable Audio</button>
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 px-4 py-2.5 flex items-center justify-center gap-4 shrink-0">
+          <span className="font-medium text-sm">🔇 Browser blocked audio playback</span>
+          <button onClick={enableAudio} className="bg-amber-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:bg-amber-700 transition">Enable Audio</button>
         </div>
       )}
 
-      {/* Transcription prompt */}
+      {/* Transcription prompt - shows when speaker is live but transcription is off */}
       {room.currentSpeaker && !transcribing && (
-        <div className="fixed top-14 left-0 right-0 z-50 bg-blue-50 border-b border-blue-200 text-blue-800 px-4 py-2.5 flex items-center justify-center gap-4">
-          <span className="font-medium text-sm">Live transcription is off</span>
-          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-semibold text-xs hover:bg-blue-700 transition">Enable Transcript</button>
+        <div className="bg-blue-50 border-b border-blue-200 text-blue-800 px-4 py-2.5 flex items-center justify-center gap-4 shrink-0">
+          <span className="font-medium text-sm">🎙️ Live transcription is off</span>
+          <button onClick={() => { hasPermission.current = true; startTranscription(); }} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-semibold text-xs hover:bg-blue-700 transition">Enable Transcript</button>
         </div>
       )}
 
@@ -828,7 +828,7 @@ function HostDash({ room, onEnd }) {
             if (transcribing) { stopTranscription(); } else { hasPermission.current = true; startTranscription(); }
           }}>
             <MessageSquare size={14} />
-            {transcribing && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+            {transcribing ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> <span className="hidden sm:inline">Live</span></> : <span className="hidden sm:inline">Transcript</span>}
           </Btn>
           {room.currentSpeaker && (
             <>
