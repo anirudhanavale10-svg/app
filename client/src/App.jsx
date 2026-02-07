@@ -243,6 +243,25 @@ function LangSelect({ value, onChange }) {
   );
 }
 
+// ─── Beep sound for profanity ────────────────────────────────────────────────
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 1000; // classic TV beep tone
+    gain.gain.value = 0.3;
+    osc.start();
+    // Quick fade out
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.stop(ctx.currentTime + 0.4);
+    setTimeout(() => ctx.close(), 500);
+  } catch {}
+}
+
 // ─── Text-to-Speech helper ───────────────────────────────────────────────────
 const TTS_LANG_MAP = {
   en: "en-US", fr: "fr-FR", de: "de-DE", es: "es-ES", it: "it-IT",
@@ -312,6 +331,17 @@ function TranscriptPanel({ transcript, compact = false }) {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [transcript, translated]);
+
+  // Play beep when profanity is detected
+  const lastBeepId = useRef(null);
+  useEffect(() => {
+    if (transcript.length === 0) return;
+    const last = transcript[transcript.length - 1];
+    if (last.beeped && last.id !== lastBeepId.current) {
+      lastBeepId.current = last.id;
+      playBeep();
+    }
+  }, [transcript.length]);
 
   // Reset when language changes
   useEffect(() => {
@@ -409,8 +439,11 @@ function TranscriptPanel({ transcript, compact = false }) {
           const key = `${e.id}-${lang}`;
           const t = lang === "en" ? e.text : translated[key];
           return (
-            <div key={e.id || i} className={`bg-black/30 rounded-lg ${compact ? "p-2" : "p-4"}`}>
-              <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
+            <div key={e.id || i} className={`rounded-lg ${compact ? "p-2" : "p-4"} ${e.beeped ? "bg-red-900/30 border border-red-500/20" : "bg-black/30"}`}>
+              <div className="flex items-center gap-2">
+                <span className={`text-cyan-400 font-bold ${compact ? "text-xs" : "text-sm"}`}>{e.speaker}</span>
+                {e.beeped && <span className="text-red-400 text-[10px]">🔇 filtered</span>}
+              </div>
               {t === null || t === undefined ? (
                 <p className={`mt-1 ${compact ? "text-xs" : "text-base"} text-slate-400 italic animate-pulse`}>Translating...</p>
               ) : (

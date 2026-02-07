@@ -17,6 +17,77 @@ const users = new Map();
 const events = [];
 const rooms = new Map();
 
+// ─── Profanity Filter (multi-language) ──────────────────────────────────────
+const PROFANITY = new Set([
+  // English
+  'fuck','shit','bitch','asshole','bastard','damn','crap','dick','pussy','cock',
+  'motherfucker','fucker','fucking','bullshit','ass','whore','slut','piss',
+  'wanker','cunt','twat','bollocks','arse','shitty','dumbass','jackass',
+  // French
+  'merde','putain','connard','connasse','salaud','salope','bordel','enculé',
+  'nique','foutre','bite','couille','pétasse','batard','con','chier',
+  // German
+  'scheiße','scheisse','arschloch','fick','ficken','hurensohn','wichser',
+  'fotze','schwanz','miststück','drecksau','schlampe','vollidiot',
+  // Spanish
+  'mierda','puta','cabrón','coño','joder','pendejo','chingar','verga',
+  'culo','maricón','hijueputa','carajo','gilipollas','hostia','capullo',
+  // Italian
+  'cazzo','merda','stronzo','vaffanculo','minchia','puttana','coglione',
+  'figa','culo','porco','bastardo','troia',
+  // Portuguese
+  'caralho','foda','merda','porra','puta','buceta','filho da puta',
+  'corno','viado','otário',
+  // Dutch
+  'kut','lul','godverdomme','klootzak','hoer','tering','kanker','tyfus',
+  'mongool','flikker',
+  // Polish
+  'kurwa','cholera','pierdolić','dupek','skurwysyn','zasraniec','gówno',
+  'chuj','suka','dupa',
+  // Romanian
+  'pula','pizdă','futui','dracu','căcat','curva','muie','coaie',
+  // Czech
+  'kurva','hovno','prdel','svině','zasraný','debil','kretén','píča',
+  // Hungarian
+  'fasz','baszd','kurva','segg','szar','geci','rohadék','köcsög',
+  // Russian
+  'блять','сука','хуй','пизда','ебать','мудак','пиздец','залупа',
+  // Turkish
+  'siktir','amına','orospu','piç','göt','yarrak','ibne',
+  // Croatian/Serbian
+  'jebem','kurac','pička','sranje','kurva','govno',
+  // Swedish
+  'jävla','fan','skit','fitta','helvete','hora','kuk',
+  // Danish/Norwegian
+  'fanden','lort','røv','pik','luder',
+  // Finnish
+  'vittu','perkele','saatana','paska','kyrpä',
+  // Greek
+  'γαμώ','μαλάκα','πούτσα','σκατά','πουτάνα',
+  // Bulgarian
+  'шибан','путка','майната','курва',
+]);
+
+function filterProfanity(text) {
+  let filtered = text;
+  let beeped = false;
+  const words = text.split(/(\s+)/); // split keeping whitespace
+  
+  const result = words.map(word => {
+    const clean = word.toLowerCase().replace(/[.,!?;:'"()]/g, '');
+    if (clean.length >= 3 && PROFANITY.has(clean)) {
+      beeped = true;
+      // Keep first letter, replace rest with *
+      const punct = word.match(/[.,!?;:'"()]+$/)?.[0] || '';
+      const core = word.slice(0, word.length - punct.length);
+      return core[0] + '*'.repeat(core.length - 1) + punct;
+    }
+    return word;
+  }).join('');
+  
+  return { text: result, beeped };
+}
+
 async function seedAdmin() {
   const hash = await bcrypt.hash('admin123', 10);
   users.set('admin@speakapp.io', {
@@ -356,8 +427,19 @@ io.on('connection', (socket) => {
   socket.on('transcript_send', ({ roomId, text, speaker }) => {
     const room = getRoom(roomId);
     if (!room || !text) return;
-    console.log(`📝 Transcript [${roomId}]: ${speaker}: ${text}`);
-    const entry = { id: Date.now(), speaker: speaker || room.currentSpeaker?.name || 'Speaker', text, timestamp: Date.now() };
+    
+    // Filter profanity
+    const { text: cleanText, beeped } = filterProfanity(text);
+    if (beeped) console.log(`🚫 Profanity filtered [${roomId}]: "${text}" → "${cleanText}"`);
+    else console.log(`📝 Transcript [${roomId}]: ${speaker}: ${text}`);
+    
+    const entry = { 
+      id: Date.now(), 
+      speaker: speaker || room.currentSpeaker?.name || 'Speaker', 
+      text: cleanText, 
+      beeped,
+      timestamp: Date.now() 
+    };
     room.transcript.push(entry);
     if (room.transcript.length > 100) room.transcript = room.transcript.slice(-100);
     io.to(room.id).emit('transcript_update', entry);
