@@ -126,6 +126,46 @@ async function translateText(text, targetLang) {
   return result;
 }
 
+// Translate original text then apply profanity filter to the translation
+async function translateAndFilter(originalText, targetLang) {
+  if (!originalText || targetLang === "en") return { translated: originalText, beeped: false };
+
+  const result = await new Promise((resolve) => {
+    translateQueue = translateQueue.then(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      try {
+        const r = await fetch(`${API}/api/translate-filter`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: originalText, target: targetLang }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          resolve({ translated: d.translated || originalText, beeped: d.beeped || false });
+          return;
+        }
+      } catch {}
+      // Fallback: regular translate (won't filter but at least translates)
+      try {
+        const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
+        const r = await fetch(
+          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
+        );
+        if (r.ok) {
+          const d = await r.json();
+          const result = d.responseData?.translatedText;
+          if (result && !result.includes("MYMEMORY WARNING")) {
+            resolve({ translated: result, beeped: false });
+            return;
+          }
+        }
+      } catch {}
+      resolve({ translated: originalText, beeped: false });
+    });
+  });
+  return result;
+}
+
 // ─── Auth Context ────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
 
@@ -276,33 +316,77 @@ const TTS_LANG_MAP = {
 let ttsQueue = [];
 let ttsSpeaking = false;
 
-function speakText(text, langCode) {
-  if (!text || !window.speechSynthesis) return;
+function speakText(text, langCode, shouldBeep = false) {
+  if (!text && !shouldBeep) return;
   
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = TTS_LANG_MAP[langCode] || langCode;
-  utter.rate = 0.9;
-  utter.pitch = 1.0;
-  utter.volume = 1.0;
+  if (shouldBeep) {
+    // Queue a beep sound instead of speech
+    ttsQueue.push({ type: "beep" });
+  }
+  
+  if (text && window.speechSynthesis) {
+    // Remove asterisks from text for TTS — strip censored words like f*****, с***, μ*****
+    const cleanForTTS = text.replace(/\S\*{2,}\S?/g, "").replace(/\s{2,}/g, " ").trim();
+    if (!cleanForTTS) {
+      // Entire text was profanity, just queue beep
+      if (!shouldBeep) ttsQueue.push({ type: "beep" });
+      processNextTTS();
+      return;
+    }
+    
+    const utter = new SpeechSynthesisUtterance(cleanForTTS);
+    utter.lang = TTS_LANG_MAP[langCode] || langCode;
+    utter.rate = 0.9;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
 
-  const voices = window.speechSynthesis.getVoices();
-  const langPrefix = (TTS_LANG_MAP[langCode] || langCode).split("-")[0];
-  const voice = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("google")) ||
-                voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("microsoft")) ||
-                voices.find((v) => v.lang.startsWith(langPrefix));
-  if (voice) utter.voice = voice;
+    const voices = window.speechSynthesis.getVoices();
+    const langPrefix = (TTS_LANG_MAP[langCode] || langCode).split("-")[0];
+    const voice = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("google")) ||
+                  voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("microsoft")) ||
+                  voices.find((v) => v.lang.startsWith(langPrefix));
+    if (voice) utter.voice = voice;
 
-  utter.onend = () => { ttsSpeaking = false; processNextTTS(); };
-  utter.onerror = () => { ttsSpeaking = false; processNextTTS(); };
-
-  ttsQueue.push(utter);
+    ttsQueue.push({ type: "speech", utter });
+  }
+  
   processNextTTS();
 }
 
 function processNextTTS() {
-  if (ttsSpeaking || ttsQueue.length === 0 || !window.speechSynthesis) return;
+  if (ttsSpeaking || ttsQueue.length === 0) return;
   ttsSpeaking = true;
-  window.speechSynthesis.speak(ttsQueue.shift());
+  
+  const item = ttsQueue.shift();
+  
+  if (item.type === "beep") {
+    // Play beep via AudioContext
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 1000;
+      gain.gain.value = 0.5;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.stop(ctx.currentTime + 0.5);
+      setTimeout(() => { ctx.close(); ttsSpeaking = false; processNextTTS(); }, 550);
+    } catch {
+      ttsSpeaking = false;
+      processNextTTS();
+    }
+  } else if (item.type === "speech" && item.utter) {
+    item.utter.onend = () => { ttsSpeaking = false; processNextTTS(); };
+    item.utter.onerror = () => { ttsSpeaking = false; processNextTTS(); };
+    if (window.speechSynthesis) window.speechSynthesis.speak(item.utter);
+    else { ttsSpeaking = false; processNextTTS(); }
+  } else {
+    ttsSpeaking = false;
+    processNextTTS();
+  }
 }
 
 function stopAllTTS() {
@@ -362,15 +446,29 @@ function TranscriptPanel({ transcript, compact = false }) {
       // Mark as in-progress
       setTranslated((prev) => ({ ...prev, [key]: null }));
 
-      translateText(entry.text, lang).then((result) => {
-        setTranslated((prev) => ({ ...prev, [key]: result }));
-        
-        // Speak if audio is on and hasn't been spoken yet
-        if (audioOn && !spokenIds.current.has(key)) {
-          spokenIds.current.add(key);
-          speakText(result, lang);
-        }
-      });
+      if (entry.beeped && entry.originalText) {
+        // For beeped entries: translate the ORIGINAL text, then filter the translation
+        translateAndFilter(entry.originalText, lang).then(({ translated: result, beeped: translationBeeped }) => {
+          setTranslated((prev) => ({ ...prev, [key]: result }));
+          
+          // Speak if audio is on
+          if (audioOn && !spokenIds.current.has(key)) {
+            spokenIds.current.add(key);
+            // Play beep THEN speak the filtered translation (with stars stripped)
+            speakText(result, lang, true); // true = play beep before speaking
+          }
+        });
+      } else {
+        // Normal entry: translate normally
+        translateText(entry.text, lang).then((result) => {
+          setTranslated((prev) => ({ ...prev, [key]: result }));
+          
+          if (audioOn && !spokenIds.current.has(key)) {
+            spokenIds.current.add(key);
+            speakText(result, lang, false);
+          }
+        });
+      }
     });
   }, [transcript.length, lang, audioOn]);
 
@@ -386,7 +484,7 @@ function TranscriptPanel({ transcript, compact = false }) {
       const t = translated[key];
       if (t && !spokenIds.current.has(key)) {
         spokenIds.current.add(key);
-        speakText(t, lang);
+        speakText(t, lang, last.beeped || false);
       }
     }
   }, [audioOn]);

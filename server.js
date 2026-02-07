@@ -432,6 +432,52 @@ app.post('/api/translate', async (req, res) => {
   }
 });
 
+// Translate original text and then apply profanity filter to the translation
+app.post('/api/translate-filter', async (req, res) => {
+  try {
+    const { text, target } = req.body;
+    if (!text || !target) return res.status(400).json({ error: 'text and target required' });
+    
+    const tl = target === 'no' ? 'no' : target === 'lb' ? 'de' : target;
+    let translated = text;
+    
+    // Try Google Translate first
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${tl}&dt=t&q=${encodeURIComponent(text.slice(0, 1000))}`;
+      const gRes = await fetch(url);
+      if (gRes.ok) {
+        const d = await gRes.json();
+        if (d && d[0]) {
+          const t = d[0].map(s => s[0]).join('');
+          if (t && t.toLowerCase() !== text.toLowerCase()) translated = t;
+        }
+      }
+    } catch (e) { console.log('Google translate failed:', e.message); }
+    
+    // If Google failed, try MyMemory
+    if (translated === text) {
+      try {
+        const mmTl = target === 'no' ? 'nb' : target === 'lb' ? 'de' : target;
+        const mmRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${mmTl}&de=speakapp@conference.io`);
+        if (mmRes.ok) {
+          const d = await mmRes.json();
+          const result = d.responseData?.translatedText;
+          if (result && !result.includes('MYMEMORY WARNING') && result.toLowerCase() !== text.toLowerCase()) {
+            translated = result;
+          }
+        }
+      } catch (e) { console.log('MyMemory failed:', e.message); }
+    }
+    
+    // Apply profanity filter to the translated text
+    const { text: filtered, beeped } = filterProfanity(translated);
+    res.json({ translated: filtered, beeped, source: 'filtered' });
+  } catch (e) {
+    console.error('Translate-filter error:', e);
+    res.json({ translated: req.body?.text || '', beeped: false, source: 'error' });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -673,7 +719,8 @@ io.on('connection', (socket) => {
     const entry = { 
       id: Date.now(), 
       speaker: speaker || room.currentSpeaker?.name || 'Speaker', 
-      text: cleanText, 
+      text: cleanText,
+      originalText: beeped ? text : undefined, // send original for translation only if beeped
       beeped,
       timestamp: Date.now() 
     };
