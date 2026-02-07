@@ -84,30 +84,72 @@ const LANGUAGES = [
 // Translation queue to avoid rate limiting
 let translateQueue = Promise.resolve();
 
+// Google Translate (unofficial, no key needed, best quality)
+async function googleTranslate(text, targetLang) {
+  const tl = targetLang === "no" ? "no" : targetLang === "lb" ? "de" : targetLang;
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Google failed");
+  const d = await r.json();
+  // Response format: [[["translated text","original text",null,null,10]]]
+  if (d && d[0]) {
+    return d[0].map((s) => s[0]).join("");
+  }
+  throw new Error("No result");
+}
+
+// LibreTranslate (free public instance, good quality)
+async function libreTranslate(text, targetLang) {
+  const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
+  const r = await fetch("https://libretranslate.com/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ q: text, source: "en", target: tl }),
+  });
+  if (!r.ok) throw new Error("Libre failed");
+  const d = await r.json();
+  if (d.translatedText) return d.translatedText;
+  throw new Error("No result");
+}
+
+// MyMemory (fallback, decent quality)
+async function myMemoryTranslate(text, targetLang) {
+  const tl = targetLang === "no" ? "nb" : targetLang === "lb" ? "de" : targetLang;
+  const r = await fetch(
+    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
+  );
+  if (!r.ok) throw new Error("MyMemory failed");
+  const d = await r.json();
+  const result = d.responseData?.translatedText;
+  if (result && !result.includes("MYMEMORY WARNING") && result.toLowerCase() !== text.toLowerCase()) {
+    return result;
+  }
+  throw new Error("No result");
+}
+
 async function translateText(text, targetLang) {
   if (!text || targetLang === "en") return text;
-  // MyMemory language code fixes
-  const langMap = { "no": "nb", "lb": "de" }; // Norwegian→Bokmål, Luxembourgish→German fallback
-  const tl = langMap[targetLang] || targetLang;
 
-  // Queue translations to avoid hitting rate limits
+  // Queue translations to avoid rate limits
   const result = await new Promise((resolve) => {
     translateQueue = translateQueue.then(async () => {
+      await new Promise((r) => setTimeout(r, 100));
       try {
-        // Small delay between requests to avoid rate limits
-        await new Promise(r => setTimeout(r, 200));
-        const r = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}&de=speakapp@conference.io`
-        );
-        if (!r.ok) { resolve(text); return; }
-        const d = await r.json();
-        const translated = d.responseData?.translatedText;
-        if (translated && !translated.includes("MYMEMORY WARNING") && translated.toLowerCase() !== text.toLowerCase()) {
-          resolve(translated);
-        } else {
-          resolve(text);
-        }
-      } catch { resolve(text); }
+        // Try Google first (best quality)
+        const t = await googleTranslate(text, targetLang);
+        if (t && t.toLowerCase() !== text.toLowerCase()) { resolve(t); return; }
+      } catch {}
+      try {
+        // Fallback: LibreTranslate
+        const t = await libreTranslate(text, targetLang);
+        if (t && t.toLowerCase() !== text.toLowerCase()) { resolve(t); return; }
+      } catch {}
+      try {
+        // Last resort: MyMemory
+        const t = await myMemoryTranslate(text, targetLang);
+        if (t) { resolve(t); return; }
+      } catch {}
+      resolve(text); // All failed, return original
     });
   });
   return result;
@@ -246,15 +288,20 @@ function speakText(text, langCode) {
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = TTS_LANG_MAP[langCode] || langCode;
-  utter.rate = 1.0;
+  utter.rate = 0.9; // Slightly slower for clarity
   utter.pitch = 1.0;
   utter.volume = 1.0;
 
-  // Try to find a voice matching the language
+  // Try to find the best voice for the language
   const voices = window.speechSynthesis.getVoices();
-  const match = voices.find((v) => v.lang.startsWith(langCode)) ||
-                voices.find((v) => v.lang.startsWith(TTS_LANG_MAP[langCode]?.split("-")[0]));
-  if (match) utter.voice = match;
+  const langPrefix = (TTS_LANG_MAP[langCode] || langCode).split("-")[0];
+  
+  // Prefer: 1) Google voices (highest quality), 2) Microsoft, 3) Any match
+  const googleVoice = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("google"));
+  const msVoice = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("microsoft"));
+  const anyVoice = voices.find((v) => v.lang.startsWith(langPrefix));
+  
+  utter.voice = googleVoice || msVoice || anyVoice || null;
 
   window.speechSynthesis.speak(utter);
 }
