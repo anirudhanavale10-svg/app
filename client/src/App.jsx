@@ -333,22 +333,45 @@ let ttsSpeaking = false;
 function speakText(text, langCode, shouldBeep = false) {
   if (!text && !shouldBeep) return;
   
-  if (shouldBeep) {
-    // Queue a beep sound instead of speech
-    ttsQueue.push({ type: "beep" });
-  }
-  
-  if (text && window.speechSynthesis) {
-    // Remove asterisks from text for TTS — strip censored words like f*****, с***, μ*****
-    const cleanForTTS = text.replace(/\S\*{2,}\S?/g, "").replace(/\s{2,}/g, " ").trim();
-    if (!cleanForTTS) {
-      // Entire text was profanity, just queue beep
-      if (!shouldBeep) ttsQueue.push({ type: "beep" });
-      processNextTTS();
-      return;
-    }
+  if (shouldBeep && text && window.speechSynthesis) {
+    // Split text around censored words (e.g. "I will f*** you" → ["I will ", "f***", " you"])
+    // Then queue: speak before → beep → speak after
+    const parts = text.split(/(\S\*{2,}\S?)/g).filter(Boolean);
     
-    const utter = new SpeechSynthesisUtterance(cleanForTTS);
+    let hasContent = false;
+    for (const part of parts) {
+      if (/\S\*{2,}/.test(part)) {
+        // This is a censored word — queue a beep
+        ttsQueue.push({ type: "beep" });
+      } else {
+        const clean = part.trim();
+        if (clean) {
+          hasContent = true;
+          const utter = new SpeechSynthesisUtterance(clean);
+          utter.lang = TTS_LANG_MAP[langCode] || langCode;
+          utter.rate = 0.9;
+          utter.pitch = 1.0;
+          utter.volume = 1.0;
+          const voices = window.speechSynthesis.getVoices();
+          const langPrefix = (TTS_LANG_MAP[langCode] || langCode).split("-")[0];
+          const voice = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("google")) ||
+                        voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("microsoft")) ||
+                        voices.find((v) => v.lang.startsWith(langPrefix));
+          if (voice) utter.voice = voice;
+          ttsQueue.push({ type: "speech", utter });
+        }
+      }
+    }
+    // If entire text was profanity, just beep
+    if (!hasContent && ttsQueue.length === 0) {
+      ttsQueue.push({ type: "beep" });
+    }
+  } else if (shouldBeep && !text) {
+    // No text, just beep
+    ttsQueue.push({ type: "beep" });
+  } else if (text && window.speechSynthesis) {
+    // Normal text, no beep needed
+    const utter = new SpeechSynthesisUtterance(text);
     utter.lang = TTS_LANG_MAP[langCode] || langCode;
     utter.rate = 0.9;
     utter.pitch = 1.0;
