@@ -50,26 +50,34 @@ const ICE = {
   rtcpMuxPolicy: "require",
 };
 
-// ─── Translation languages ───────────────────────────────────────────────────
+// ─── Translation languages (European) ────────────────────────────────────────
 const LANGUAGES = [
   { code: "en", label: "English" },
-  { code: "es", label: "Español" },
   { code: "fr", label: "Français" },
   { code: "de", label: "Deutsch" },
-  { code: "hi", label: "हिन्दी" },
-  { code: "zh-CN", label: "中文" },
-  { code: "ar", label: "العربية" },
-  { code: "pt", label: "Português" },
-  { code: "ja", label: "日本語" },
-  { code: "ko", label: "한국어" },
+  { code: "es", label: "Español" },
   { code: "it", label: "Italiano" },
+  { code: "pt", label: "Português" },
+  { code: "nl", label: "Nederlands" },
+  { code: "pl", label: "Polski" },
+  { code: "ro", label: "Română" },
+  { code: "sv", label: "Svenska" },
+  { code: "da", label: "Dansk" },
+  { code: "no", label: "Norsk" },
+  { code: "fi", label: "Suomi" },
+  { code: "el", label: "Ελληνικά" },
+  { code: "cs", label: "Čeština" },
+  { code: "hu", label: "Magyar" },
   { code: "ru", label: "Русский" },
+  { code: "uk", label: "Українська" },
+  { code: "tr", label: "Türkçe" },
+  { code: "lb", label: "Lëtzebuergesch" },
 ];
 
 async function translateText(text, targetLang) {
   if (!text || targetLang === "en") return text;
-  // MyMemory uses different codes for some languages
-  const langMap = { "zh-CN": "zh", "zh": "zh" };
+  // MyMemory language code overrides for European languages
+  const langMap = { "no": "nb", "lb": "lb" };
   const tl = langMap[targetLang] || targetLang;
   try {
     const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=en|${tl}`);
