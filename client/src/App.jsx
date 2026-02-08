@@ -448,9 +448,11 @@ function TranscriptPanel({ transcript, compact = false }) {
     }
   }, []);
 
-  // Auto-scroll
+  // Auto-scroll - use setTimeout to ensure DOM has updated
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }, 50);
   }, [transcript, translated]);
 
   // Play beep when profanity is detected
@@ -472,12 +474,20 @@ function TranscriptPanel({ transcript, compact = false }) {
     setAudioOn(false);
   }, [lang]);
 
-  // Translate new entries when they arrive
+  // Translate new entries when they arrive (and speak English entries directly)
   useEffect(() => {
-    if (lang === "en") return;
-
     transcript.forEach((entry) => {
       const key = `${entry.id}-${lang}`;
+      
+      if (lang === "en") {
+        // English: no translation needed, but speak if audio is on
+        if (audioOn && !spokenIds.current.has(key)) {
+          spokenIds.current.add(key);
+          speakText(entry.text, "en", entry.beeped || false);
+        }
+        return;
+      }
+
       if (translated[key] !== undefined) return; // already translated or in progress
 
       // Mark as in-progress
@@ -509,19 +519,26 @@ function TranscriptPanel({ transcript, compact = false }) {
     });
   }, [transcript.length, lang, audioOn]);
 
-  // When audio is toggled on, speak any untranslated entries
+  // When audio is toggled on, speak the most recent entry
   useEffect(() => {
     if (!audioOn) { stopAllTTS(); spokenIds.current.clear(); return; }
-    if (lang === "en") return;
 
     // Speak the most recent entry that hasn't been spoken
     const last = transcript[transcript.length - 1];
     if (last) {
       const key = `${last.id}-${lang}`;
-      const t = translated[key];
-      if (t && !spokenIds.current.has(key)) {
-        spokenIds.current.add(key);
-        speakText(t, lang, last.beeped || false);
+      if (lang === "en") {
+        // English: speak original text directly
+        if (!spokenIds.current.has(key)) {
+          spokenIds.current.add(key);
+          speakText(last.text, "en", last.beeped || false);
+        }
+      } else {
+        const t = translated[key];
+        if (t && !spokenIds.current.has(key)) {
+          spokenIds.current.add(key);
+          speakText(t, lang, last.beeped || false);
+        }
       }
     }
   }, [audioOn]);
@@ -540,37 +557,33 @@ function TranscriptPanel({ transcript, compact = false }) {
           )}
         </h3>
         <div className="flex items-center gap-2">
-          {lang !== "en" && (
-            <button
-              onClick={() => {
-                if (!audioOn) {
-                  if (window.speechSynthesis) {
-                    const u = new SpeechSynthesisUtterance("");
-                    u.volume = 0;
-                    window.speechSynthesis.speak(u);
-                  }
+          <button
+            onClick={() => {
+              if (!audioOn) {
+                if (window.speechSynthesis) {
+                  const u = new SpeechSynthesisUtterance("");
+                  u.volume = 0;
+                  window.speechSynthesis.speak(u);
                 }
-                setAudioOn(!audioOn);
-              }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                audioOn
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700"
-              }`}
-            >
-              {audioOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
-              {audioOn ? "Audio ON" : "Listen"}
-            </button>
-          )}
+              }
+              setAudioOn(!audioOn);
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              audioOn
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700"
+            }`}
+          >
+            {audioOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            {audioOn ? "Audio ON" : "Listen"}
+          </button>
           <LangSelect value={lang} onChange={setLang} />
         </div>
       </div>
-      {lang !== "en" && (
-        <div className="mb-2 text-xs flex items-center gap-1.5 shrink-0 text-blue-500">
-          <Globe size={11} /> {LANGUAGES.find((l) => l.code === lang)?.label || lang}
-          {audioOn && <span className="ml-1 text-emerald-600">• Audio on</span>}
-        </div>
-      )}
+      <div className="mb-2 text-xs flex items-center gap-1.5 shrink-0 text-blue-500">
+        <Globe size={11} /> {LANGUAGES.find((l) => l.code === lang)?.label || lang}
+        {audioOn && <span className="ml-1 text-emerald-600">• Audio on</span>}
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 min-h-0">
         {!transcript.length ? (
           <p className="text-sm text-slate-400 italic">Transcript appears here when someone speaks...</p>

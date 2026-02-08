@@ -210,6 +210,8 @@ const PROFANITY_PREFIXES = ['mother','sister','brother','father','bull','horse',
 
 // Safe words that should NEVER be filtered (common false positives)
 const SAFELIST = new Set([
+  // Common short English words (false positives from multilingual profanity lists)
+  'am','an','con','fan','pot','dam',
   'ashley','ass','assume','assault','assemble','assembly','assert','assertion','assess','assessment',
   'asset','assets','assign','assignment','assist','assistant','associate','association',
   'class','classic','classical','classification','classified','classify','classroom',
