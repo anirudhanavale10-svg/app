@@ -687,11 +687,19 @@ io.on('connection', (socket) => {
   // WebRTC signaling
   socket.on('webrtc_offer', ({ roomId, offer }) => {
     const room = getRoom(roomId);
-    if (room) io.to(room.hostSocketId).emit('webrtc_offer', { from: socket.id, offer });
+    if (room) {
+      console.log(`📡 WebRTC offer: ${socket.id.slice(0,8)} → host ${room.hostSocketId.slice(0,8)} [${roomId}]`);
+      io.to(room.hostSocketId).emit('webrtc_offer', { from: socket.id, offer });
+    } else {
+      console.warn(`⚠️ WebRTC offer for unknown room: ${roomId}`);
+    }
   });
 
   socket.on('webrtc_answer', ({ to, answer }) => {
-    if (to) io.to(to).emit('webrtc_answer', { from: socket.id, answer });
+    if (to) {
+      console.log(`📡 WebRTC answer: ${socket.id.slice(0,8)} → ${to.slice(0,8)}`);
+      io.to(to).emit('webrtc_answer', { from: socket.id, answer });
+    }
   });
 
   socket.on('webrtc_ice', ({ roomId, candidate, to }) => {

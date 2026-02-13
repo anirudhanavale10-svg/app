@@ -37,28 +37,38 @@ let ICE = {
 };
 
 // Fetch fresh TURN credentials from Cloudflare (free, temporary creds)
+let _turnReady = false;
 async function refreshTurnCredentials() {
   try {
     const r = await fetch("https://speed.cloudflare.com/turn-creds");
     if (r.ok) {
       const creds = await r.json();
-      ICE = {
-        ...ICE,
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun.cloudflare.com:3478" },
-          { urls: creds.urls.filter(u => u.startsWith("turn:") || u.startsWith("turns:")), username: creds.username, credential: creds.credential },
-        ],
-      };
-      console.log("✅ TURN credentials refreshed");
+      const turnUrls = creds.urls.filter(u => u.startsWith("turn:") || u.startsWith("turns:"));
+      if (turnUrls.length > 0) {
+        ICE = {
+          ...ICE,
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun.cloudflare.com:3478" },
+            { urls: turnUrls, username: creds.username, credential: creds.credential },
+          ],
+        };
+        _turnReady = true;
+        console.log("✅ TURN credentials refreshed:", turnUrls.length, "servers");
+        return;
+      }
     }
+    throw new Error("No TURN URLs in response");
   } catch (e) {
-    console.warn("⚠️ Could not fetch TURN creds, using STUN only:", e.message);
+    console.warn("⚠️ Cloudflare TURN failed:", e.message, "- using STUN-only (may fail behind strict NAT)");
+    _turnReady = false;
   }
 }
-// Fetch on load
-refreshTurnCredentials();
-// Refresh every 20 minutes (creds may expire)
+// Fetch on load + retry once after 3s if first attempt fails
+refreshTurnCredentials().then(() => {
+  if (!_turnReady) setTimeout(refreshTurnCredentials, 3000);
+});
+// Refresh every 20 minutes (creds expire)
 setInterval(refreshTurnCredentials, 20 * 60 * 1000);
 
 // ─── Translation languages (European focus) ─────────────────────────────────
@@ -750,20 +760,24 @@ function HostDash({ room, onEnd }) {
 
     sk.on("webrtc_offer", async ({ from, offer }) => {
       try {
+        console.log("📥 WebRTC offer received from", from);
         if (pc.current) { pc.current.close(); pc.current = null; }
+        console.log("🔧 ICE config:", JSON.stringify(ICE.iceServers.map(s => s.urls)));
         const c = new RTCPeerConnection(ICE);
         pc.current = c;
 
         // Handle incoming audio track
         c.ontrack = (e) => {
-          console.log("🎧 Got audio track from speaker");
+          console.log("🎧 Got audio track from speaker, streams:", e.streams.length);
           if (audio.current && e.streams[0]) {
             audio.current.srcObject = e.streams[0];
+            audio.current.muted = false;
             audio.current.play().then(() => {
-              console.log("✅ Audio playing");
+              console.log("✅ Audio playing through speakers");
               setAudioBlocked(false);
+              setAudioOn(true);
             }).catch((err) => {
-              console.warn("Autoplay blocked:", err);
+              console.warn("⚠️ Autoplay blocked:", err.message);
               setAudioBlocked(true);
             });
           }
@@ -774,7 +788,17 @@ function HostDash({ room, onEnd }) {
         };
 
         c.oniceconnectionstatechange = () => {
-          console.log("ICE state:", c.iceConnectionState);
+          const state = c.iceConnectionState;
+          console.log("🔗 Host ICE state:", state);
+          if (state === "connected" || state === "completed") console.log("✅ Host: WebRTC audio connected!");
+          if (state === "failed") {
+            console.error("❌ Host: WebRTC FAILED - trying ICE restart");
+            c.restartIce();
+          }
+        };
+
+        c.onconnectionstatechange = () => {
+          console.log("📶 Host connection state:", c.connectionState);
         };
 
         await c.setRemoteDescription(new RTCSessionDescription(offer));
@@ -782,7 +806,7 @@ function HostDash({ room, onEnd }) {
         await c.setLocalDescription(ans);
         sk.emit("webrtc_answer", { roomId: room.id, answer: ans, to: from });
         console.log("✅ WebRTC answer sent to", from);
-      } catch (err) { console.error("WebRTC error:", err); }
+      } catch (err) { console.error("❌ WebRTC error:", err); }
     });
 
     sk.on("webrtc_ice", async ({ candidate }) => {
@@ -1020,83 +1044,97 @@ function Attendee({ room, user, onExit }) {
       console.log("🎤 Requesting microphone...");
       const ms = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: { ideal: true },
-          noiseSuppression: { ideal: true },
-          autoGainControl: { ideal: true },
-          sampleRate: 48000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
           channelCount: 1,
-          latency: { ideal: 0 },
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-          googEchoCancellation2: true,
-          googDAEchoCancellation: true,
         }
       });
-      console.log("✅ Microphone granted");
+      console.log("✅ Microphone granted, tracks:", ms.getAudioTracks().length);
       stream.current = ms;
 
-      // ── Audio processing chain to eliminate echo ──
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      window._speakAppAudioCtx = audioCtx;
-      const source = audioCtx.createMediaStreamSource(ms);
+      // ── Try audio processing chain, fall back to raw mic if it fails ──
+      let streamToSend = ms;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        window._speakAppAudioCtx = audioCtx;
 
-      // 1. High-pass filter - cuts low-frequency room rumble & speaker bleed
-      const highpass = audioCtx.createBiquadFilter();
-      highpass.type = "highpass";
-      highpass.frequency.value = 150; // Cut below 150Hz (speaker echo is bassy)
-      highpass.Q.value = 0.7;
+        // CRITICAL: Resume AudioContext - on mobile it starts suspended
+        if (audioCtx.state === "suspended") {
+          console.log("⚠️ AudioContext suspended, resuming...");
+          await audioCtx.resume();
+        }
+        console.log("🔊 AudioContext state:", audioCtx.state);
 
-      // 2. Noise gate via dynamics compressor
-      //    Aggressive threshold = only lets through loud/close speech
-      //    Echo from speakers is quieter than direct speech into phone mic
-      const compressor = audioCtx.createDynamicsCompressor();
-      compressor.threshold.value = -35;  // Only pass audio above this level
-      compressor.knee.value = 5;         // Hard knee = sharp cutoff
-      compressor.ratio.value = 20;       // Heavy compression below threshold
-      compressor.attack.value = 0.003;   // Fast attack
-      compressor.release.value = 0.1;    // Quick release so speech sounds natural
+        if (audioCtx.state === "running") {
+          const source = audioCtx.createMediaStreamSource(ms);
+          const highpass = audioCtx.createBiquadFilter();
+          highpass.type = "highpass";
+          highpass.frequency.value = 100;
+          highpass.Q.value = 0.7;
 
-      // 3. Gain boost to compensate for compression
-      const makeupGain = audioCtx.createGain();
-      makeupGain.gain.value = 1.5;
+          const compressor = audioCtx.createDynamicsCompressor();
+          compressor.threshold.value = -50;
+          compressor.knee.value = 10;
+          compressor.ratio.value = 12;
+          compressor.attack.value = 0.003;
+          compressor.release.value = 0.15;
 
-      // 4. Second high-pass to clean up any remaining artifacts
-      const highpass2 = audioCtx.createBiquadFilter();
-      highpass2.type = "highpass";
-      highpass2.frequency.value = 80;
+          const makeupGain = audioCtx.createGain();
+          makeupGain.gain.value = 1.3;
 
-      // Connect chain: mic -> highpass -> compressor -> gain -> highpass2 -> output
-      const dest = audioCtx.createMediaStreamDestination();
-      source.connect(highpass);
-      highpass.connect(compressor);
-      compressor.connect(makeupGain);
-      makeupGain.connect(highpass2);
-      highpass2.connect(dest);
+          const dest = audioCtx.createMediaStreamDestination();
+          source.connect(highpass);
+          highpass.connect(compressor);
+          compressor.connect(makeupGain);
+          makeupGain.connect(dest);
 
-      const processedStream = dest.stream;
+          streamToSend = dest.stream;
+          console.log("✅ Audio processing chain active");
+        } else {
+          console.warn("⚠️ AudioContext not running, using raw mic");
+        }
+      } catch (chainErr) {
+        console.warn("⚠️ Audio chain failed, using raw mic:", chainErr.message);
+        // streamToSend remains as raw ms
+      }
 
+      console.log("📡 Creating WebRTC connection...");
+      console.log("🔧 ICE servers:", JSON.stringify(ICE.iceServers.map(s => s.urls)));
       const c = new RTCPeerConnection(ICE);
       pc.current = c;
-      processedStream.getTracks().forEach((t) => c.addTrack(t, processedStream));
+      streamToSend.getTracks().forEach((t) => {
+        c.addTrack(t, streamToSend);
+        console.log("📎 Added track:", t.kind, t.label, "enabled:", t.enabled);
+      });
 
       c.onicecandidate = (e) => {
-        if (e.candidate) s.current.emit("webrtc_ice", { roomId: room.id, candidate: e.candidate });
+        if (e.candidate) {
+          s.current.emit("webrtc_ice", { roomId: room.id, candidate: e.candidate });
+        }
       };
 
       c.oniceconnectionstatechange = () => {
-        console.log("ICE state:", c.iceConnectionState);
-        if (c.iceConnectionState === "connected") console.log("✅ WebRTC connected - audio streaming");
-        if (c.iceConnectionState === "failed") console.error("❌ WebRTC connection failed");
+        const state = c.iceConnectionState;
+        console.log("🔗 ICE state:", state);
+        if (state === "connected" || state === "completed") console.log("✅ WebRTC connected - audio streaming!");
+        if (state === "failed") {
+          console.error("❌ WebRTC connection FAILED - trying ICE restart");
+          c.restartIce();
+        }
+        if (state === "disconnected") console.warn("⚠️ WebRTC disconnected, may recover...");
+      };
+
+      c.onconnectionstatechange = () => {
+        console.log("📶 Connection state:", c.connectionState);
       };
 
       const offer = await c.createOffer();
       await c.setLocalDescription(offer);
       s.current.emit("webrtc_offer", { roomId: room.id, offer });
-      console.log("📡 WebRTC offer sent");
+      console.log("📡 WebRTC offer sent to room", room.id);
     } catch (err) {
-      console.error("Microphone error:", err);
+      console.error("❌ Microphone/WebRTC error:", err);
       alert("Microphone access required. Please allow microphone permission and try again.");
     }
   }, [room.id]);
